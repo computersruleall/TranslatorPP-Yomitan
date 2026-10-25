@@ -9,15 +9,13 @@ import org.joml.Matrix3x2f;
 import org.joml.Vector2f;
 
 import java.util.ArrayList;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Records every piece of text the GUI drew in the last frame, with where it
- * was drawn. All GUI text (screens, HUD, tooltips, books, chat) is submitted
- * through {@code GuiRenderState.addText}, so this is what lets a lookup work on
- * any text without knowing which screen or widget drew it.
+ * was drawn. All GUI text (screens, HUD, tooltips, books, chat) becomes a
+ * {@code GuiTextRenderState}, so this is what lets a lookup work on any text
+ * without knowing which screen or widget drew it.
  */
 public final class TextCapture {
     /** A frame with more text than this is unusual; stop recording rather than grow without bound. */
@@ -48,32 +46,26 @@ public final class TextCapture {
         }
     }
 
-    /**
-     * Text is kept per render state: besides vanilla's, clients such as Lunar draw
-     * their own GUI layer through another one, and each is reset on its own
-     * schedule. One shared buffer would be emptied by whichever reset came last.
-     */
-    private static final Map<Object, List<Run>> building = new IdentityHashMap<>();
-    private static final Map<Object, List<Run>> lastFrames = new IdentityHashMap<>();
+    private static List<Run> building = new ArrayList<>();
+    private static List<Run> lastFrame = List.of();
     private static int suppressed;
     private static int tooltipDepth;
 
     private TextCapture() {
     }
 
-    public static void onText(Object owner, GuiTextRenderState state) {
-        List<Run> runs = building.computeIfAbsent(owner, o -> new ArrayList<>());
-        if (suppressed > 0 || runs.size() >= MAX_RUNS) {
+    public static void onText(GuiTextRenderState state) {
+        if (suppressed > 0 || building.size() >= MAX_RUNS) {
             return;
         }
-        runs.add(new Run(state.font, state.text, new Matrix3x2f(state.pose), state.x, state.y,
+        building.add(new Run(state.font, state.text, new Matrix3x2f(state.pose), state.x, state.y,
                 state.scissor, tooltipDepth > 0));
     }
 
-    /** Called when a render state is reset, once per frame after it is drawn. */
-    public static void endFrame(Object owner) {
-        List<Run> runs = building.remove(owner);
-        lastFrames.put(owner, runs == null ? List.of() : runs);
+    /** Called once per frame, after the GUI is drawn. */
+    public static void endFrame() {
+        lastFrame = building;
+        building = new ArrayList<>(Math.max(64, lastFrame.size()));
         tooltipDepth = 0;
     }
 
@@ -95,19 +87,12 @@ public final class TextCapture {
         }
     }
 
-    /** Everything drawn in the last completed frame of every render state, in drawing order per state. */
     static List<Run> lastFrame() {
-        List<Run> all = new ArrayList<>();
-        lastFrames.values().forEach(all::addAll);
-        return all;
+        return lastFrame;
     }
 
-    /** For the log: how many render states there are and how much text each drew. */
+    /** For the log: how much text the last frame drew. */
     static String describe() {
-        StringBuilder builder = new StringBuilder();
-        lastFrames.forEach((owner, runs) -> builder.append(owner.getClass().getName()).append('@')
-                .append(Integer.toHexString(System.identityHashCode(owner))).append('=').append(runs.size())
-                .append(" (tooltip ").append(runs.stream().filter(Run::tooltip).count()).append(") "));
-        return builder.isEmpty() ? "no text captured" : builder.toString();
+        return lastFrame.size() + " lines (" + lastFrame.stream().filter(Run::tooltip).count() + " in tooltips)";
     }
 }
