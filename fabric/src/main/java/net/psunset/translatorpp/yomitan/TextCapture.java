@@ -81,6 +81,15 @@ public final class TextCapture {
         tooltipDepth = Math.max(0, tooltipDepth - 1);
     }
 
+    /** Item stack counts are drawn between these: they are numbers on slots, not text to look up. */
+    public static void beginUncaptured() {
+        suppressed++;
+    }
+
+    public static void endUncaptured() {
+        suppressed = Math.max(0, suppressed - 1);
+    }
+
     /** Our own box and popup are drawn inside this, so they don't end up in the capture. */
     static void runUncaptured(Runnable draw) {
         suppressed++;

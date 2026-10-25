@@ -472,6 +472,9 @@ public final class YomitanOverlay {
                 continue;
             }
             LineGlyphs glyphs = LineGlyphs.measure(run.font(), run.text());
+            if (glyphs.text().chars().allMatch(c -> c >= '0' && c <= '9')) {
+                continue; // stack counts and other bare numbers: never worth a lookup
+            }
             int index = glyphs.indexAt((int) Math.floor(local.x));
             if (index >= 0) {
                 return new ScreenTarget(run, glyphs, index,
