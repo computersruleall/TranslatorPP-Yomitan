@@ -37,6 +37,7 @@
     "key.category.translatorpp.general": "Translator++",
     "key.translatorpp.translate": "Translate",
     "key.translatorpp.config": "Open Translator++ Options",
+    "key.translatorpp.pin": "Pin Text for Dictionary Lookup (with Shift if middle click)",
     "misc.translatorpp.translation.failure": "Translation failed...",
     "misc.translatorpp.translation.failure.chat": "Translation got an error:\n%s",
     "misc.translatorpp.translation.failure.chat.status_code": "Translation got an error code %d.\nError content:\n%s",

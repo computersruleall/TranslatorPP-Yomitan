@@ -5,6 +5,7 @@
     "minVersion": "0.8",
     "plugin": "net.psunset.translatorpp.fabric.TPPMixinPluginImpl",
     "client": [
+        "AbstractContainerScreenMixin",
         "FabricClientCommandSourceMixin"
     ],
     "mixins": [

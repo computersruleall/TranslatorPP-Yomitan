@@ -5,6 +5,7 @@ import net.psunset.translatorpp.TranslatorPP;
 import net.psunset.translatorpp.event.fabric.TPPEventsImpl;
 import net.psunset.translatorpp.keybind.fabric.TPPKeyMappingsImpl;
 import net.psunset.translatorpp.platform.fabric.PlatformImpl;
+import net.psunset.translatorpp.yomitan.YomitanOverlay;
 
 public final class TranslatorPPImpl implements ClientModInitializer {
     @Override
@@ -20,5 +21,6 @@ public final class TranslatorPPImpl implements ClientModInitializer {
         /* Later */
 
         TPPEventsImpl.init();
+        YomitanOverlay.init();
     }
 }

@@ -23,6 +23,14 @@ public final class TPPKeyMappings {
             Categories.GENERAL
     );
 
+    /** Shift + middle click by default; plain middle click is left to menus and creative. */
+    public static final KeyMapping PIN_KEY = register(
+            "key.translatorpp.pin",
+            InputConstants.Type.MOUSE,
+            InputConstants.MOUSE_BUTTON_MIDDLE,
+            Categories.GENERAL
+    );
+
     private static KeyMapping register(String translation, InputConstants.Type type, int keyCode, KeyMapping.Category category) {
         var key = new KeyMapping(translation, type, keyCode, category);
         ENTRIES.add(key);
