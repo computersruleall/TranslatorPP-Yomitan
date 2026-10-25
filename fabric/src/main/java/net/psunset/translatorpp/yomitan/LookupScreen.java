@@ -18,6 +18,7 @@ import java.util.List;
 public final class LookupScreen extends Screen {
     private final @Nullable Component source;
     private final List<Component> lines;
+    private final long openedAt = System.currentTimeMillis();
 
     /** Frees the cursor over the HUD. */
     public LookupScreen() {
@@ -46,10 +47,13 @@ public final class LookupScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
-        if (source == null) {
+        long shown = System.currentTimeMillis() - openedAt;
+        if (source == null && shown < 3000) {
+            // Under the crosshair, and only briefly, so it never covers the boss bar or other HUD text.
+            int alpha = shown < 2000 ? 0xFF : (int) (0xFF * (3000 - shown) / 1000);
             Component hint = Component.literal("Hold ").append(TPPKeyMappings.LOOKUP_KEY.getTranslatedKeyMessage())
                     .append(" over any text to look it up · Esc or ").append(TPPKeyMappings.FREE_CURSOR_KEY.getTranslatedKeyMessage()).append(" to close").withStyle(ChatFormatting.GRAY);
-            TextCapture.runUncaptured(() -> graphics.centeredText(font, hint, width / 2, 6, 0xFFFFFFFF));
+            TextCapture.runUncaptured(() -> graphics.centeredText(font, hint, width / 2, height / 2 + 24, (Math.max(alpha, 8) << 24) | 0xFFFFFF));
         }
     }
 

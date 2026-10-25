@@ -176,6 +176,8 @@ public final class YomitanOverlay {
     private static int lastMouseX;
     private static int lastMouseY;
     private static long lastDiagnosticAt;
+    private static @Nullable Screen lastDescribedScreen;
+    private static int framesOnScreen;
 
     private YomitanOverlay() {
     }
@@ -378,6 +380,14 @@ public final class YomitanOverlay {
         lastMouseX = mouseX;
         lastMouseY = mouseY;
         Font font = client.font;
+        if (screen != lastDescribedScreen) {
+            lastDescribedScreen = screen;
+            framesOnScreen = 0;
+        } else if (++framesOnScreen == 10) {
+            // A few frames in, so the capture holds this screen's text.
+            DebugLog.write("opened " + screen.getClass().getName() + " (title '" + screen.getTitle().getString()
+                    + "'); captured: " + TextCapture.describe());
+        }
 
         if (isLookupHeld() && !(popup != null && popup.contains(mouseX, mouseY))) {
             Target target = targetAt(font, mouseX, mouseY);
@@ -463,8 +473,8 @@ public final class YomitanOverlay {
                 .min(Comparator.comparingDouble(run -> run.toScreen(0, 0).distanceSquared(mouseX, mouseY)))
                 .map(run -> "'" + LineGlyphs.measure(run.font(), run.text()).text(0, 30) + "' at " + run.toScreen(0, 0))
                 .orElse("none");
-        TranslatorPP.LOGGER.info("[Yomitan] nothing under cursor ({}, {}) on {}; captured: {}; nearest run: {}",
-                mouseX, mouseY, screen.getClass().getName(), TextCapture.describe(), nearest);
+        DebugLog.write("nothing under cursor (" + mouseX + ", " + mouseY + ") on " + screen.getClass().getName()
+                + "; captured: " + TextCapture.describe() + "; nearest run: " + nearest);
     }
 
     private static void lookUp(Target target) {
@@ -472,10 +482,10 @@ public final class YomitanOverlay {
         activeMatchLength = 0;
         int request = ++generation;
         String query = target.query();
-        TranslatorPP.LOGGER.info("[Yomitan] looking up '{}' ({})", query, target.getClass().getSimpleName());
+        DebugLog.write("looking up '" + query + "' (" + target.getClass().getSimpleName() + ")");
         YomitanClient.termEntries(query).whenComplete((entries, error) -> client.execute(() -> {
-            TranslatorPP.LOGGER.info("[Yomitan] '{}' -> {}", query, error != null ? error.toString()
-                    : entries.size() + " entries" + (request != generation ? " (stale, dropped)" : ""));
+            DebugLog.write("'" + query + "' -> " + (error != null ? error.toString()
+                    : entries.size() + " entries" + (request != generation ? " (stale, dropped)" : "")));
             if (request != generation) {
                 return; // the cursor moved on, or the box was closed
             }
