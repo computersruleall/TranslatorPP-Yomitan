@@ -24,7 +24,9 @@ In game:
   - During play: opens a lookup screen. Aimed at a sign, text display or nametag, that text is pinned (text
     behind blocks is skipped unless the game draws it through walls; stacked hologram lines are joined).
     Otherwise the screen is transparent and just frees the cursor, so the HUD can be hovered.
-- Drag the box by its header. Esc closes the popup, then the box; the pin key over the box also closes it.
+- Drag the box by its header. Left-click drag over its text to select, then Ctrl+C to copy.
+  Any click outside the popup closes it; Esc closes the popup, then the box; the pin key over the box also closes it.
+- The popup's width and max height are in the settings screen (O), under Yomitan.
 - Translation keeps its own key (T). It is ignored while you are typing in a text box, and the default
   target language is English.
 

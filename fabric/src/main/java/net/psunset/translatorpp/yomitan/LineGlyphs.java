@@ -45,6 +45,21 @@ record LineGlyphs(int[] codePoints, int[] startX, int width) {
         return -1;
     }
 
+    /** The gap between characters nearest {@code localX}: 0 is before the first, length after the last. */
+    int boundaryAt(int localX) {
+        for (int i = 0; i < codePoints.length; i++) {
+            if (localX < startX[i] + cellWidth(i) / 2) {
+                return i;
+            }
+        }
+        return codePoints.length;
+    }
+
+    /** Local x of the gap before character {@code boundary}. */
+    int boundaryX(int boundary) {
+        return boundary < startX.length ? startX[boundary] : width;
+    }
+
     String text(int from, int maxCodePoints) {
         StringBuilder builder = new StringBuilder();
         for (int i = from; i < codePoints.length && i < from + maxCodePoints; i++) {

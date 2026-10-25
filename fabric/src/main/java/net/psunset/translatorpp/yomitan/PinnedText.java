@@ -7,6 +7,7 @@ import net.minecraft.util.FormattedCharSequence;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -29,6 +30,9 @@ public final class PinnedText {
     private final int height;
     private int x;
     private int y;
+    /** Drag selection as {line, boundary} ends; null when nothing is selected. */
+    private int @Nullable [] selectionAnchor;
+    private int @Nullable [] selectionCaret;
 
     /** Pins plain components, wrapping any that are too wide. */
     public static PinnedText ofComponents(Font font, Component title, List<Component> source, int anchorX, int anchorY,
@@ -106,6 +110,61 @@ public final class PinnedText {
         return new Hit(row, index, x + PADDING + line.startX()[index], textTop() + row * font.lineHeight, line.cellWidth(index));
     }
 
+    /** Whether the cursor is over the text rows, where dragging selects rather than moves the box. */
+    public boolean onText(double mouseX, double mouseY) {
+        return contains(mouseX, mouseY) && !onHeader(mouseX, mouseY);
+    }
+
+    private int[] caretAt(Font font, double mouseX, double mouseY) {
+        int row = (int) Math.floor((mouseY - textTop()) / font.lineHeight);
+        row = Math.max(0, Math.min(row, glyphs.size() - 1));
+        return new int[]{row, glyphs.get(row).boundaryAt((int) Math.floor(mouseX - (x + PADDING)))};
+    }
+
+    public void startSelection(Font font, double mouseX, double mouseY) {
+        if (glyphs.isEmpty()) {
+            return;
+        }
+        selectionAnchor = caretAt(font, mouseX, mouseY);
+        selectionCaret = selectionAnchor;
+    }
+
+    public void extendSelection(Font font, double mouseX, double mouseY) {
+        if (selectionAnchor != null) {
+            selectionCaret = caretAt(font, mouseX, mouseY);
+        }
+    }
+
+    public boolean hasSelection() {
+        return selectionAnchor != null && selectionCaret != null && !Arrays.equals(selectionAnchor, selectionCaret);
+    }
+
+    /** The selection's ends in reading order. */
+    private int[][] orderedSelection() {
+        boolean forward = selectionAnchor[0] < selectionCaret[0]
+                || (selectionAnchor[0] == selectionCaret[0] && selectionAnchor[1] <= selectionCaret[1]);
+        return forward ? new int[][]{selectionAnchor, selectionCaret} : new int[][]{selectionCaret, selectionAnchor};
+    }
+
+    /** The selected text, lines joined with newlines. */
+    public String selectedText() {
+        if (!hasSelection()) {
+            return "";
+        }
+        int[][] range = orderedSelection();
+        StringBuilder builder = new StringBuilder();
+        for (int line = range[0][0]; line <= range[1][0]; line++) {
+            LineGlyphs row = glyphs.get(line);
+            int from = line == range[0][0] ? range[0][1] : 0;
+            int to = line == range[1][0] ? range[1][1] : row.codePoints().length;
+            if (line > range[0][0]) {
+                builder.append('\n');
+            }
+            builder.append(row.text(from, to - from));
+        }
+        return builder.toString();
+    }
+
     /** The text Yomitan should scan, starting at the hovered character. */
     public String queryAt(Hit hit, int maxCodePoints) {
         return glyphs.get(hit.line()).text(hit.index(), maxCodePoints);
@@ -119,6 +178,17 @@ public final class PinnedText {
     public void extract(GuiGraphicsExtractor graphics, Font font) {
         Overlays.panel(graphics, x, y, width, height);
         graphics.text(font, title, x + PADDING, y + PADDING, 0xFF8A8AA0, false);
+        if (hasSelection()) {
+            int[][] range = orderedSelection();
+            for (int line = range[0][0]; line <= range[1][0]; line++) {
+                LineGlyphs row = glyphs.get(line);
+                int from = line == range[0][0] ? range[0][1] : 0;
+                int to = line == range[1][0] ? range[1][1] : row.codePoints().length;
+                int top = textTop() + line * font.lineHeight;
+                graphics.fill(x + PADDING + row.boundaryX(from), top - 1, x + PADDING + row.boundaryX(to) + (to == from ? 2 : 0),
+                        top + font.lineHeight - 1, 0xA02F6FD0);
+            }
+        }
         int lineY = textTop();
         for (FormattedCharSequence line : lines) {
             graphics.text(font, line, x + PADDING, lineY, 0xFFFFFFFF, true);

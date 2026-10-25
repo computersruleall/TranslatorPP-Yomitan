@@ -170,6 +170,7 @@ public final class YomitanOverlay {
     private static int activeMatchLength;
     private static int generation;
     private static boolean dragging;
+    private static boolean selecting;
     private static double dragOffsetX;
     private static double dragOffsetY;
     private static int lastMouseX;
@@ -185,6 +186,7 @@ public final class YomitanOverlay {
             ScreenMouseEvents.allowMouseDrag(screen).register(YomitanOverlay::allowMouseDrag);
             ScreenMouseEvents.afterMouseRelease(screen).register((s, click, consumed) -> {
                 dragging = false;
+                selecting = false;
                 return consumed;
             });
             ScreenMouseEvents.allowMouseScroll(screen).register(YomitanOverlay::allowMouseScroll);
@@ -231,6 +233,7 @@ public final class YomitanOverlay {
         active = null;
         activeMatchLength = 0;
         dragging = false;
+        selecting = false;
         generation++;
     }
 
@@ -296,6 +299,9 @@ public final class YomitanOverlay {
                 dragging = true;
                 dragOffsetX = mouseX - pinned.x();
                 dragOffsetY = mouseY - pinned.y();
+            } else if (click.button() == InputConstants.MOUSE_BUTTON_LEFT && pinned.onText(mouseX, mouseY)) {
+                selecting = true;
+                pinned.startSelection(client.font, mouseX, mouseY);
             }
             return false;
         }
@@ -312,6 +318,10 @@ public final class YomitanOverlay {
     }
 
     private static boolean allowMouseDrag(Screen screen, MouseButtonEvent click, double dragX, double dragY) {
+        if (selecting && pinned != null) {
+            pinned.extendSelection(client.font, click.x(), click.y());
+            return false;
+        }
         if (!dragging || pinned == null) {
             return true;
         }
@@ -330,6 +340,11 @@ public final class YomitanOverlay {
     }
 
     private static boolean allowKeyPress(Screen screen, KeyEvent key) {
+        if (key.isCopy() && pinned != null && pinned.hasSelection()) {
+            client.keyboardHandler.setClipboard(pinned.selectedText());
+            client.gui.hud.setOverlayMessage(Component.literal("Copied to clipboard"), false);
+            return false;
+        }
         if (key.isEscape() && !(screen instanceof LookupScreen)) {
             if (popup != null) {
                 popup = null;
