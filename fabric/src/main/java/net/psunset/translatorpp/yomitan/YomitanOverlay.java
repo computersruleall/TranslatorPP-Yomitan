@@ -84,12 +84,20 @@ public final class YomitanOverlay {
 
         @Override
         public void highlight(GuiGraphicsExtractor graphics, Font font, int utf16Length) {
-            graphics.fill(hit.x(), hit.y() - 1, box.matchEndX(hit, utf16Length), hit.y() + font.lineHeight - 1, MATCH_HIGHLIGHT);
+            box.highlight(graphics, font, hit, utf16Length, MATCH_HIGHLIGHT);
         }
     }
 
-    /** A character of text the screen or HUD drew last frame. */
-    private record ScreenTarget(TextCapture.Run run, LineGlyphs glyphs, int index) implements Target {
+    /** One drawn line of a text block, measured. */
+    private record ScreenLine(TextCapture.Run run, LineGlyphs glyphs) {
+    }
+
+    /**
+     * A character of text the screen or HUD drew last frame, plus the lines drawn
+     * directly below it in the same block (a book page, wrapped lore), so a word
+     * that wraps onto the next line is still found.
+     */
+    private record ScreenTarget(TextCapture.Run run, LineGlyphs glyphs, int index, List<ScreenLine> following) implements Target {
         @Override
         public boolean sameAs(@Nullable Target other) {
             return other instanceof ScreenTarget o && o.index == index && o.run.x() == run.x() && o.run.y() == run.y()
@@ -98,7 +106,15 @@ public final class YomitanOverlay {
 
         @Override
         public String query() {
-            return glyphs.text(index, SCAN_LENGTH);
+            StringBuilder query = new StringBuilder(glyphs.text(index, SCAN_LENGTH));
+            for (ScreenLine line : following) {
+                int room = SCAN_LENGTH - query.codePointCount(0, query.length());
+                if (room <= 0) {
+                    break;
+                }
+                query.append(line.glyphs().text(0, room));
+            }
+            return query.toString();
         }
 
         @Override
@@ -113,10 +129,23 @@ public final class YomitanOverlay {
 
         @Override
         public void highlight(GuiGraphicsExtractor graphics, Font font, int utf16Length) {
-            Vector2f a = run.toScreen(glyphs.startX()[index], -1);
-            Vector2f b = run.toScreen(glyphs.matchEndX(index, utf16Length), run.font().lineHeight - 1);
+            int remaining = utf16Length - highlightSpan(graphics, run, glyphs, index, utf16Length);
+            for (ScreenLine line : following) {
+                if (remaining <= 0) {
+                    break;
+                }
+                remaining -= highlightSpan(graphics, line.run(), line.glyphs(), 0, remaining);
+            }
+        }
+
+        /** Highlights up to {@code utf16Length} units of one line from {@code from}; returns the units it covered. */
+        private static int highlightSpan(GuiGraphicsExtractor graphics, TextCapture.Run run, LineGlyphs glyphs, int from,
+                                         int utf16Length) {
+            Vector2f a = run.toScreen(glyphs.boundaryX(from), -1);
+            Vector2f b = run.toScreen(glyphs.matchEndX(from, utf16Length), run.font().lineHeight - 1);
             graphics.fill(Math.round(Math.min(a.x, b.x)), Math.round(Math.min(a.y, b.y)),
                     Math.round(Math.max(a.x, b.x)), Math.round(Math.max(a.y, b.y)), MATCH_HIGHLIGHT);
+            return glyphs.utf16LengthFrom(from);
         }
     }
 
@@ -445,13 +474,43 @@ public final class YomitanOverlay {
             LineGlyphs glyphs = LineGlyphs.measure(run.font(), run.text());
             int index = glyphs.indexAt((int) Math.floor(local.x));
             if (index >= 0) {
-                return new ScreenTarget(run, glyphs, index);
+                return new ScreenTarget(run, glyphs, index,
+                        linesBelow(runs, run, glyphs.codePoints().length - index));
             }
         }
         if (client.gui.screen() instanceof ChatScreen) {
             return chatTargetAt(font, mouseX, mouseY);
         }
         return null;
+    }
+
+    /**
+     * The lines drawn directly under {@code first}: left-aligned with it, one
+     * line height lower each, in the same font. Stops once the query is full.
+     */
+    private static List<ScreenLine> linesBelow(List<TextCapture.Run> runs, TextCapture.Run first, int charsSoFar) {
+        List<ScreenLine> lines = new ArrayList<>();
+        TextCapture.Run current = first;
+        int chars = charsSoFar;
+        while (chars < SCAN_LENGTH && lines.size() < 4) {
+            Vector2f expected = current.toScreen(0, current.font().lineHeight);
+            TextCapture.Run next = null;
+            for (TextCapture.Run candidate : runs) {
+                if (candidate != current && !candidate.tooltip() && candidate.font() == current.font()
+                        && candidate.toScreen(0, 0).distanceSquared(expected) < 2.25F) {
+                    next = candidate;
+                    break;
+                }
+            }
+            if (next == null) {
+                break;
+            }
+            LineGlyphs glyphs = LineGlyphs.measure(next.font(), next.text());
+            lines.add(new ScreenLine(next, glyphs));
+            chars += glyphs.codePoints().length;
+            current = next;
+        }
+        return lines;
     }
 
     private static @Nullable Target chatTargetAt(Font font, int mouseX, int mouseY) {

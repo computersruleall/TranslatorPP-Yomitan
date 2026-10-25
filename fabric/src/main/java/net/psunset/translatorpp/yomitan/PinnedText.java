@@ -165,14 +165,29 @@ public final class PinnedText {
         return builder.toString();
     }
 
-    /** The text Yomitan should scan, starting at the hovered character. */
+    /**
+     * The text Yomitan should scan, starting at the hovered character. It runs on
+     * into the following lines, so a word wrapped onto the next line still matches.
+     */
     public String queryAt(Hit hit, int maxCodePoints) {
-        return glyphs.get(hit.line()).text(hit.index(), maxCodePoints);
+        StringBuilder query = new StringBuilder(glyphs.get(hit.line()).text(hit.index(), maxCodePoints));
+        for (int line = hit.line() + 1; line < glyphs.size() && query.codePointCount(0, query.length()) < maxCodePoints; line++) {
+            query.append(glyphs.get(line).text(0, maxCodePoints - query.codePointCount(0, query.length())));
+        }
+        return query.toString();
     }
 
-    /** Screen x of the end of a match that is {@code utf16Length} long, starting at the hit. */
-    public int matchEndX(Hit hit, int utf16Length) {
-        return x + PADDING + glyphs.get(hit.line()).matchEndX(hit.index(), utf16Length);
+    /** Highlights a match {@code utf16Length} long from the hit, continuing onto following lines. */
+    public void highlight(GuiGraphicsExtractor graphics, Font font, Hit hit, int utf16Length, int color) {
+        int remaining = utf16Length;
+        for (int line = hit.line(); line < glyphs.size() && remaining > 0; line++) {
+            LineGlyphs row = glyphs.get(line);
+            int from = line == hit.line() ? hit.index() : 0;
+            int top = textTop() + line * font.lineHeight;
+            graphics.fill(x + PADDING + row.boundaryX(from), top - 1, x + PADDING + row.matchEndX(from, remaining),
+                    top + font.lineHeight - 1, color);
+            remaining -= row.utf16LengthFrom(from);
+        }
     }
 
     public void extract(GuiGraphicsExtractor graphics, Font font) {

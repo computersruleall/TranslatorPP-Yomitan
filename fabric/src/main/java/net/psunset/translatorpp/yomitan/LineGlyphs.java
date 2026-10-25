@@ -72,6 +72,15 @@ record LineGlyphs(int[] codePoints, int[] startX, int width) {
         return text(0, codePoints.length);
     }
 
+    /** UTF-16 length of the text from character {@code from} to the end of the line. */
+    int utf16LengthFrom(int from) {
+        int units = 0;
+        for (int i = from; i < codePoints.length; i++) {
+            units += Character.charCount(codePoints[i]);
+        }
+        return units;
+    }
+
     int cellWidth(int index) {
         return (index + 1 < startX.length ? startX[index + 1] : width) - startX[index];
     }
