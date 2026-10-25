@@ -7,7 +7,7 @@
     "client": [
         "AbstractContainerScreenMixin",
         "GuiGraphicsExtractorMixin",
-        "GuiRenderStateMixin",
+        "GameRendererMixin",
         "GuiTextRenderStateMixin",
         "FabricClientCommandSourceMixin"
     ],

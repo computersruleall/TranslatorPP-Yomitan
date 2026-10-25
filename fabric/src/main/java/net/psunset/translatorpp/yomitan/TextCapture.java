@@ -48,6 +48,8 @@ public final class TextCapture {
 
     private static List<Run> building = new ArrayList<>();
     private static List<Run> lastFrame = List.of();
+    private static long textsSeen;
+    private static long framesClosed;
     private static int suppressed;
     private static int tooltipDepth;
 
@@ -55,6 +57,7 @@ public final class TextCapture {
     }
 
     public static void onText(GuiTextRenderState state) {
+        textsSeen++;
         if (suppressed > 0 || building.size() >= MAX_RUNS) {
             return;
         }
@@ -62,8 +65,9 @@ public final class TextCapture {
                 state.scissor, tooltipDepth > 0));
     }
 
-    /** Called once per frame, after the GUI is drawn. */
+    /** Called at the start of each frame, closing the previous one. */
     public static void endFrame() {
+        framesClosed++;
         lastFrame = building;
         building = new ArrayList<>(Math.max(64, lastFrame.size()));
         tooltipDepth = 0;
@@ -93,6 +97,7 @@ public final class TextCapture {
 
     /** For the log: how much text the last frame drew. */
     static String describe() {
-        return lastFrame.size() + " lines (" + lastFrame.stream().filter(Run::tooltip).count() + " in tooltips)";
+        return lastFrame.size() + " lines (" + lastFrame.stream().filter(Run::tooltip).count() + " in tooltips; "
+                + textsSeen + " texts seen and " + framesClosed + " frames closed since launch, suppressed=" + suppressed + ")";
     }
 }
