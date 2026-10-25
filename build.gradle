@@ -2,7 +2,6 @@ plugins {
     id 'dev.architectury.loom-no-remap' version '1.17-SNAPSHOT' apply false
     id 'architectury-plugin' version '3.5-SNAPSHOT'
     id 'com.gradleup.shadow' version '9.4.2' apply false
-    id "me.modmuss50.mod-publish-plugin" version "2.0.0"
 }
 
 def secrets = new Properties()
@@ -99,63 +98,3 @@ subprojects {
     }
 }
 
-publishMods {
-    changelog = file("CHANGELOG.md").text
-    type = STABLE
-
-    def curseforgeSettings = curseforgeOptions {
-        accessToken = secrets.getProperty("CURSEFORGE_TOKEN")
-        projectId = "1254626"
-        minecraftVersionRange {
-            start = "26.2"
-            end = "26.2"
-        }
-        javaVersions.add JavaVersion.VERSION_25
-
-        clientRequired = true
-        serverRequired = false
-
-        changelogType = "markdown"
-    }
-
-    def modrinthSettings = modrinthOptions {
-        accessToken = secrets.getProperty("MODRINTH_TOKEN")
-        projectId = "Bl9j6Jsi"
-        minecraftVersionRange {
-            start = "26.2"
-            end = "26.2"
-        }
-    }
-
-    curseforge("curseforgeFabric") {
-        from curseforgeSettings
-        file project(":fabric")
-        displayName = "[Fabric $minecraft_display_version] v$mod_version"
-        version.set "$mod_version+fabric-$minecraft_display_version"
-        modLoaders.addAll "fabric", "quilt"
-    }
-
-    curseforge("curseforgeNeoForge") {
-        from curseforgeSettings
-        file project(":neoforge")
-        displayName = "[NeoForge $minecraft_display_version] v$mod_version"
-        version.set "$mod_version+neoforge-$minecraft_display_version"
-        modLoaders.add "neoforge"
-    }
-
-    modrinth("modrinthFabric") {
-        from modrinthSettings
-        file project(":fabric")
-        displayName = "[Fabric $minecraft_display_version] v$mod_version"
-        version.set "$mod_version+fabric-$minecraft_display_version"
-        modLoaders.addAll "fabric", "quilt"
-    }
-
-    modrinth("modrinthNeoForge") {
-        from modrinthSettings
-        file project(":neoforge")
-        displayName = "[NeoForge $minecraft_display_version] v$mod_version"
-        version.set "$mod_version+neoforge-$minecraft_display_version"
-        modLoaders.add "neoforge"
-    }
-}

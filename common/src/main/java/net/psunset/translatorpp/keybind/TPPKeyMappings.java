@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableSet;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.psunset.translatorpp.tool.IdUtl;
-import org.lwjgl.glfw.GLFW;
 
 public final class TPPKeyMappings {
 
@@ -12,15 +11,15 @@ public final class TPPKeyMappings {
 
     public static final KeyMapping TRANSLATE_KEY = register(
             "key.translatorpp.translate",
-            InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_T,
+            InputConstants.Type.KEYBOARD,
+            InputConstants.KEY_T,
             Categories.GENERAL
     );
 
     public static KeyMapping CONFIG_KEY = register(
             "key.translatorpp.config",
-            InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_O,
+            InputConstants.Type.KEYBOARD,
+            InputConstants.KEY_O,
             Categories.GENERAL
     );
 
