@@ -24,6 +24,8 @@ In game:
   - During play: opens a lookup screen. Aimed at a sign, text display or nametag, that text is pinned (text
     behind blocks is skipped unless the game draws it through walls; stacked hologram lines are joined).
     Otherwise the screen is transparent and just frees the cursor, so the HUD can be hovered.
+- **Free cursor**: Left Alt (rebindable as "Free Cursor for Lookups") toggles a free cursor during play without
+  moving the camera, to hover the action bar, boss bars, scoreboard and other HUD text. Press it again or Esc to close.
 - Drag the box by its header. Left-click drag over its text to select, then Ctrl+C to copy.
   Any click outside the popup closes it; Esc closes the popup, then the box; the pin key over the box also closes it.
 - The popup's width and max height are in the settings screen (O), under Yomitan.

@@ -356,6 +356,10 @@ public final class YomitanOverlay {
                 return false;
             }
         }
+        if (screen instanceof LookupScreen && TPPKeyMappings.FREE_CURSOR_KEY.matches(key)) {
+            screen.onClose();
+            return false;
+        }
         if (TPPKeyMappings.PIN_KEY.matches(key)) {
             if (screen instanceof LookupScreen) {
                 screen.onClose();
@@ -468,7 +472,10 @@ public final class YomitanOverlay {
         activeMatchLength = 0;
         int request = ++generation;
         String query = target.query();
+        TranslatorPP.LOGGER.info("[Yomitan] looking up '{}' ({})", query, target.getClass().getSimpleName());
         YomitanClient.termEntries(query).whenComplete((entries, error) -> client.execute(() -> {
+            TranslatorPP.LOGGER.info("[Yomitan] '{}' -> {}", query, error != null ? error.toString()
+                    : entries.size() + " entries" + (request != generation ? " (stale, dropped)" : ""));
             if (request != generation) {
                 return; // the cursor moved on, or the box was closed
             }
@@ -488,6 +495,11 @@ public final class YomitanOverlay {
     }
 
     private static void tick(Minecraft minecraft) {
+        while (TPPKeyMappings.FREE_CURSOR_KEY.consumeClick()) {
+            if (minecraft.gui.screen() == null && minecraft.player != null) {
+                minecraft.setScreenAndShow(new LookupScreen());
+            }
+        }
         while (TPPKeyMappings.PIN_KEY.consumeClick()) {
             if (minecraft.gui.screen() != null || minecraft.player == null || (pinNeedsShift() && !minecraft.hasShiftDown())) {
                 continue;

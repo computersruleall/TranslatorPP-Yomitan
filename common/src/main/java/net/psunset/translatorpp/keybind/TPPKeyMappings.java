@@ -39,6 +39,14 @@ public final class TPPKeyMappings {
             Categories.GENERAL
     );
 
+    /** Toggles a free cursor during play, to hover HUD text (action bar, boss bars, scoreboard). */
+    public static final KeyMapping FREE_CURSOR_KEY = register(
+            "key.translatorpp.free_cursor",
+            InputConstants.Type.KEYBOARD,
+            InputConstants.KEY_LALT,
+            Categories.GENERAL
+    );
+
     private static KeyMapping register(String translation, InputConstants.Type type, int keyCode, KeyMapping.Category category) {
         var key = new KeyMapping(translation, type, keyCode, category);
         ENTRIES.add(key);

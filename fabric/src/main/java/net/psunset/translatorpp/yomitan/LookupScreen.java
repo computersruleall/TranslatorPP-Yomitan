@@ -48,7 +48,7 @@ public final class LookupScreen extends Screen {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
         if (source == null) {
             Component hint = Component.literal("Hold ").append(TPPKeyMappings.LOOKUP_KEY.getTranslatedKeyMessage())
-                    .append(" over any text to look it up · Esc to close").withStyle(ChatFormatting.GRAY);
+                    .append(" over any text to look it up · Esc or ").append(TPPKeyMappings.FREE_CURSOR_KEY.getTranslatedKeyMessage()).append(" to close").withStyle(ChatFormatting.GRAY);
             TextCapture.runUncaptured(() -> graphics.centeredText(font, hint, width / 2, 6, 0xFFFFFFFF));
         }
     }
