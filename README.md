@@ -19,8 +19,13 @@ In game:
   - Over a chat line with chat open: pins that message.
   - In the world, aimed at a sign, text display or nametag: opens it in a lookup screen.
     Text behind blocks is skipped unless the game draws it through walls. Stacked hologram lines are joined.
-- **Look up**: hold Shift and move the cursor over the pinned text. The popup lists every result from every
-  dictionary; scroll it with the mouse wheel. The matched text is highlighted.
+- **Look up**: hold the lookup key (Left Shift, rebindable as "Yomitan Lookup") and move the cursor over the
+  pinned text. The popup lists every result from every dictionary, styled like Yomitan's popup (furigana,
+  tag pills, numbered senses); scroll it with the mouse wheel. The matched text is highlighted.
+- Translation keeps its own key (T). It is ignored while you are typing in a text box, and the default
+  target language is English.
+
+Requires Fabric API and Cloth Config.
 - Drag the box by its header. Esc closes the popup, then the box; the pin key over the box also closes it.
 
 Text that is drawn as an image (map art, custom font icons) can't be read.

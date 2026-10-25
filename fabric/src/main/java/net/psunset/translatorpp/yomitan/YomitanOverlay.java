@@ -2,6 +2,7 @@ package net.psunset.translatorpp.yomitan;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
@@ -35,8 +36,6 @@ public final class YomitanOverlay {
     /** Characters sent to Yomitan from the hovered one onwards; it finds the longest match itself. */
     private static final int SCAN_LENGTH = 20;
     private static final int MATCH_HIGHLIGHT = 0x6033AAFF;
-    private static final Component PIN_TITLE = Component.literal("Hold Shift and hover to look up · drag here")
-            .withStyle(ChatFormatting.ITALIC);
 
     private static final Minecraft client = Minecraft.getInstance();
 
@@ -80,7 +79,8 @@ public final class YomitanOverlay {
         Component title = Component.empty()
                 .append(source.copy().withStyle(ChatFormatting.GOLD))
                 .append(Component.literal(" — ").withStyle(ChatFormatting.DARK_GRAY))
-                .append(PIN_TITLE);
+                .append(Component.literal("hold ").append(TPPKeyMappings.LOOKUP_KEY.getTranslatedKeyMessage())
+                        .append(" and hover to look up · drag here").withStyle(ChatFormatting.ITALIC));
         clear();
         pinned = new PinnedText(font, title, lines, anchorX, anchorY, screenWidth(), screenHeight());
     }
@@ -104,6 +104,13 @@ public final class YomitanOverlay {
     /** The default binding is Shift + middle click, so plain middle click stays free for menus and creative. */
     private static boolean pinNeedsShift() {
         return TPPKeyMappings.PIN_KEY.matches(InputConstants.Type.MOUSE.getOrCreate(InputConstants.MOUSE_BUTTON_MIDDLE));
+    }
+
+    /** Key mappings don't track presses while a screen is open, so read the bound key directly. */
+    private static boolean isLookupHeld() {
+        InputConstants.Key key = KeyMappingHelper.getBoundKeyOf(TPPKeyMappings.LOOKUP_KEY);
+        return key.getType() == InputConstants.Type.KEYBOARD && key.getValue() != InputConstants.UNKNOWN.getValue()
+                && InputConstants.isKeyDown(key.getValue());
     }
 
     private static boolean isPinClick(MouseButtonEvent click) {
@@ -218,7 +225,7 @@ public final class YomitanOverlay {
 
         PinnedText.Hit hit = pinned.hitTest(font, mouseX, mouseY);
         boolean overPopup = popup != null && popup.contains(mouseX, mouseY);
-        if (client.hasShiftDown() && hit != null && !overPopup && !sameCharacter(hit, activeHit)) {
+        if (isLookupHeld() && hit != null && !overPopup && !sameCharacter(hit, activeHit)) {
             lookUp(hit);
         }
 

@@ -159,7 +159,7 @@ public interface TPPConfig {
     interface Default {
         TranslationMode mode = TranslationMode.NAME_TOP;
         String sourceLanguage = "auto";
-        String targetLanguage = "zh-CN";
+        String targetLanguage = "en";
         TranslationService service = TranslationService.GoogleTranslation;
         String openaiApiKey = "";
         OpenAIClientProvider.Api openaiBaseUrl = OpenAIClientProvider.Api.OpenAI;

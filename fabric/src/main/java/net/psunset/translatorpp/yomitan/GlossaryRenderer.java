@@ -53,11 +53,11 @@ public final class GlossaryRenderer {
     private void glossaryEntry(JsonElement entry) {
         newline();
         if (entry.isJsonPrimitive()) {
-            append("• " + entry.getAsString(), Style.EMPTY);
+            append("◦ " + entry.getAsString(), Style.EMPTY);
         } else if (entry.isJsonObject()) {
             JsonObject object = entry.getAsJsonObject();
             switch (TermEntry.string(object, "type")) {
-                case "text" -> append("• " + TermEntry.string(object, "text"), Style.EMPTY);
+                case "text" -> append("◦ " + TermEntry.string(object, "text"), Style.EMPTY);
                 case "structured-content" -> node(object.get("content"), Style.EMPTY);
                 default -> { /* images and unknown types have no text form */ }
             }
@@ -152,7 +152,7 @@ public final class GlossaryRenderer {
         if (custom != null && custom.equals("none")) {
             return "";
         }
-        return "• ";
+        return "◦ ";
     }
 
     private static boolean isBadge(JsonObject span) {

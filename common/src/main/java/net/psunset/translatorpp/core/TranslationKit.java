@@ -3,6 +3,7 @@ package net.psunset.translatorpp.core;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -352,6 +353,10 @@ public final class TranslationKit {
         });
 
         ScreenCallbacks.KEY_PRESSED_POST.register((screen, context) -> {
+            // While typing (e.g. a chat message) the translate key is just a letter.
+            if (screen.getFocused() instanceof EditBox box && !box.getValue().isEmpty()) {
+                return;
+            }
             if (TPPKeyMappings.TRANSLATE_KEY.matches(context)) {
                 TranslationKit.getInstance().start();
                 TranslationKit.getInstance().setKeyDown(true);

@@ -5,22 +5,27 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * One result row of a Yomitan lookup, reduced to what the popup draws.
  *
- * @param headwords   "term【reading】" for each headword merged into this entry
+ * @param headwords   the spellings merged into this entry, each with its own tags (⭐, ichi, news1k)
  * @param matchLength how many characters of the query the entry matched (UTF-16 units)
- * @param inflections deinflection chains, e.g. [["past", "polite"]]; empty when uninflected
- * @param definitions glosses in Yomitan's order, grouped per dictionary by the popup
+ * @param inflections deinflection chains, e.g. [["-ます", "-た"]]; empty when uninflected
+ * @param definitions senses in Yomitan's order
  */
-public record TermEntry(List<String> headwords, int matchLength, List<List<String>> inflections,
+public record TermEntry(List<Headword> headwords, int matchLength, List<List<String>> inflections,
                         List<Definition> definitions) {
 
-    public record Definition(String dictionary, List<String> tags, List<GlossaryRenderer.Line> lines) {
+    /** A Yomitan tag; {@code category} picks its colour (partOfSpeech, frequent, popular, name, ...). */
+    public record Tag(String name, String category) {
+    }
+
+    public record Headword(String term, String reading, List<Tag> tags) {
+    }
+
+    public record Definition(String dictionary, List<Tag> tags, List<GlossaryRenderer.Line> lines) {
     }
 
     /**
@@ -39,12 +44,10 @@ public record TermEntry(List<String> headwords, int matchLength, List<List<Strin
     }
 
     private static TermEntry parseEntry(JsonObject entry) {
-        Set<String> headwords = new LinkedHashSet<>();
+        List<Headword> headwords = new ArrayList<>();
         for (JsonElement element : array(entry, "headwords")) {
             JsonObject headword = element.getAsJsonObject();
-            String term = string(headword, "term");
-            String reading = string(headword, "reading");
-            headwords.add(reading.isEmpty() || reading.equals(term) ? term : term + "【" + reading + "】");
+            headwords.add(new Headword(string(headword, "term"), string(headword, "reading"), tags(headword)));
         }
 
         List<List<String>> inflections = new ArrayList<>();
@@ -62,21 +65,28 @@ public record TermEntry(List<String> headwords, int matchLength, List<List<Strin
         List<Definition> definitions = new ArrayList<>();
         for (JsonElement element : array(entry, "definitions")) {
             JsonObject definition = element.getAsJsonObject();
-            List<String> tags = new ArrayList<>();
-            for (JsonElement tag : array(definition, "tags")) {
-                String name = string(tag.getAsJsonObject(), "name");
-                if (!name.isEmpty()) {
-                    tags.add(name);
-                }
-            }
             definitions.add(new Definition(
                     string(definition, "dictionary"),
-                    tags,
+                    tags(definition),
                     GlossaryRenderer.render(array(definition, "entries"))));
         }
 
         int matchLength = entry.has("maxOriginalTextLength") ? entry.get("maxOriginalTextLength").getAsInt() : 0;
-        return new TermEntry(List.copyOf(headwords), matchLength, inflections, definitions);
+        return new TermEntry(headwords, matchLength, inflections, definitions);
+    }
+
+    private static List<Tag> tags(JsonObject owner) {
+        List<Tag> tags = new ArrayList<>();
+        for (JsonElement element : array(owner, "tags")) {
+            JsonObject tag = element.getAsJsonObject();
+            String name = string(tag, "name");
+            String category = string(tag, "category");
+            // JMdict numbers its senses with a "default" tag ("1", "2"); the popup numbers them itself.
+            if (!name.isEmpty() && !(category.equals("default") && name.chars().allMatch(Character::isDigit))) {
+                tags.add(new Tag(name, category));
+            }
+        }
+        return tags;
     }
 
     static JsonArray array(JsonObject object, String key) {

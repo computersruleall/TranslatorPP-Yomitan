@@ -31,6 +31,14 @@ public final class TPPKeyMappings {
             Categories.GENERAL
     );
 
+    /** Held while hovering pinned text to look it up in Yomitan. Separate from {@link #TRANSLATE_KEY} on purpose. */
+    public static final KeyMapping LOOKUP_KEY = register(
+            "key.translatorpp.lookup",
+            InputConstants.Type.KEYBOARD,
+            InputConstants.KEY_LSHIFT,
+            Categories.GENERAL
+    );
+
     private static KeyMapping register(String translation, InputConstants.Type type, int keyCode, KeyMapping.Category category) {
         var key = new KeyMapping(translation, type, keyCode, category);
         ENTRIES.add(key);
