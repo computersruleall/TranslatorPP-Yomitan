@@ -52,7 +52,7 @@ public final class LookupScreen extends Screen {
             // Under the crosshair, and only briefly, so it never covers the boss bar or other HUD text.
             int alpha = shown < 2000 ? 0xFF : (int) (0xFF * (3000 - shown) / 1000);
             Component hint = Component.literal("Hold ").append(TPPKeyMappings.LOOKUP_KEY.getTranslatedKeyMessage())
-                    .append(" over any text to look it up · Esc or ").append(TPPKeyMappings.FREE_CURSOR_KEY.getTranslatedKeyMessage()).append(" to close").withStyle(ChatFormatting.GRAY);
+                    .append(" over any text to look it up · click, Esc or ").append(TPPKeyMappings.FREE_CURSOR_KEY.getTranslatedKeyMessage()).append(" to close").withStyle(ChatFormatting.GRAY);
             TextCapture.runUncaptured(() -> graphics.centeredText(font, hint, width / 2, height / 2 + 24, (Math.max(alpha, 8) << 24) | 0xFFFFFF));
         }
     }
