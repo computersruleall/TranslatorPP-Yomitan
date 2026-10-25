@@ -205,6 +205,7 @@ public final class YomitanOverlay {
     private static int lastMouseX;
     private static int lastMouseY;
     private static long lastDiagnosticAt;
+    private static long lastContinuationLogAt;
     private static @Nullable Screen lastDescribedScreen;
     private static int framesOnScreen;
 
@@ -488,24 +489,36 @@ public final class YomitanOverlay {
     }
 
     /**
-     * The lines drawn directly under {@code first}: left-aligned with it, one
-     * line height lower each, in the same font. Stops once the query is full.
+     * The lines drawn under {@code first}, each the nearest line starting just
+     * below the previous one and left-aligned with it. Screens space their lines
+     * differently (books aren't one font line apart), so this allows anything
+     * from just over half a line to nearly two lines lower. Stops once the query is full.
      */
     private static List<ScreenLine> linesBelow(List<TextCapture.Run> runs, TextCapture.Run first, int charsSoFar) {
         List<ScreenLine> lines = new ArrayList<>();
         TextCapture.Run current = first;
         int chars = charsSoFar;
         while (chars < SCAN_LENGTH && lines.size() < 4) {
-            Vector2f expected = current.toScreen(0, current.font().lineHeight);
+            Vector2f origin = current.toScreen(0, 0);
+            float lineStep = origin.distance(current.toScreen(0, current.font().lineHeight));
             TextCapture.Run next = null;
+            float bestDy = Float.MAX_VALUE;
             for (TextCapture.Run candidate : runs) {
-                if (candidate != current && !candidate.tooltip() && candidate.font() == current.font()
-                        && candidate.toScreen(0, 0).distanceSquared(expected) < 2.25F) {
+                if (candidate == current || candidate.tooltip()) {
+                    continue;
+                }
+                Vector2f start = candidate.toScreen(0, 0);
+                float dx = Math.abs(start.x - origin.x);
+                float dy = start.y - origin.y;
+                if (dx <= 3 && dy > lineStep * 0.6F && dy < lineStep * 1.9F && dy < bestDy) {
                     next = candidate;
-                    break;
+                    bestDy = dy;
                 }
             }
             if (next == null) {
+                if (lines.isEmpty()) {
+                    logNoContinuation(runs, current, origin, lineStep);
+                }
                 break;
             }
             LineGlyphs glyphs = LineGlyphs.measure(next.font(), next.text());
@@ -514,6 +527,24 @@ public final class YomitanOverlay {
             current = next;
         }
         return lines;
+    }
+
+    /** When no next line is found, log the closest lines below, at most every few seconds. */
+    private static void logNoContinuation(List<TextCapture.Run> runs, TextCapture.Run current, Vector2f origin, float lineStep) {
+        long now = System.currentTimeMillis();
+        if (now - lastContinuationLogAt < 3000) {
+            return;
+        }
+        lastContinuationLogAt = now;
+        StringBuilder below = new StringBuilder();
+        runs.stream()
+                .filter(run -> run != current && !run.tooltip() && run.toScreen(0, 0).y > origin.y)
+                .sorted(Comparator.comparingDouble(run -> run.toScreen(0, 0).distanceSquared(origin)))
+                .limit(3)
+                .forEach(run -> below.append("'").append(LineGlyphs.measure(run.font(), run.text()).text(0, 12))
+                        .append("' at ").append(run.toScreen(0, 0)).append("; "));
+        DebugLog.write("no next line under '" + LineGlyphs.measure(current.font(), current.text()).text(0, 12) + "' at "
+                + origin + " (line step " + lineStep + "); nearest below: " + (below.isEmpty() ? "none" : below));
     }
 
     private static @Nullable Target chatTargetAt(Font font, int mouseX, int mouseY) {
