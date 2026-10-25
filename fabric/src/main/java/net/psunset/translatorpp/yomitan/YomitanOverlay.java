@@ -10,27 +10,34 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.inventory.Slot;
 import net.psunset.translatorpp.TranslatorPP;
-import net.psunset.translatorpp.api.ChatComponentAccessor;
 import net.psunset.translatorpp.keybind.TPPKeyMappings;
 import net.psunset.translatorpp.tool.TooltipUtl;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Vector2f;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
- * Pin-and-scan dictionary lookups. The pin key freezes some text into a box
- * (the hovered item's tooltip, the hovered chat line, or text in the world);
- * holding Shift over a character of that box asks the player's Yomitan for
- * that point and shows every result in a scrollable popup.
+ * Yomitan lookups on any text in the game.
+ * <ul>
+ *     <li>With a screen open, holding the lookup key over any drawn text (titles,
+ *     item names, books, chat, buttons, the HUD behind the screen) looks it up.</li>
+ *     <li>Tooltips follow the cursor, so the pin key freezes the visible tooltip
+ *     into a box that can be hovered instead.</li>
+ *     <li>In the world, the pin key opens a screen: with the sign / text display /
+ *     nametag under the crosshair pinned, or empty to free the cursor over the HUD.</li>
+ * </ul>
+ * Results come from the player's own Yomitan and show in a scrollable popup.
  */
 public final class YomitanOverlay {
     /** Characters sent to Yomitan from the hovered one onwards; it finds the longest match itself. */
@@ -39,9 +46,81 @@ public final class YomitanOverlay {
 
     private static final Minecraft client = Minecraft.getInstance();
 
+    /** Something under the cursor that can be looked up. */
+    private interface Target {
+        boolean sameAs(@Nullable Target other);
+
+        String query();
+
+        int anchorX();
+
+        int anchorY();
+
+        void highlight(GuiGraphicsExtractor graphics, Font font, int utf16Length);
+    }
+
+    private record PinnedTarget(PinnedText box, PinnedText.Hit hit) implements Target {
+        @Override
+        public boolean sameAs(@Nullable Target other) {
+            return other instanceof PinnedTarget o && o.box == box && o.hit.line() == hit.line() && o.hit.index() == hit.index();
+        }
+
+        @Override
+        public String query() {
+            return box.queryAt(hit, SCAN_LENGTH);
+        }
+
+        @Override
+        public int anchorX() {
+            return hit.x();
+        }
+
+        @Override
+        public int anchorY() {
+            return hit.y() + client.font.lineHeight + 2;
+        }
+
+        @Override
+        public void highlight(GuiGraphicsExtractor graphics, Font font, int utf16Length) {
+            graphics.fill(hit.x(), hit.y() - 1, box.matchEndX(hit, utf16Length), hit.y() + font.lineHeight - 1, MATCH_HIGHLIGHT);
+        }
+    }
+
+    /** A character of text the screen or HUD drew last frame. */
+    private record ScreenTarget(TextCapture.Run run, LineGlyphs glyphs, int index) implements Target {
+        @Override
+        public boolean sameAs(@Nullable Target other) {
+            return other instanceof ScreenTarget o && o.index == index && o.run.x() == run.x() && o.run.y() == run.y()
+                    && o.run.pose().equals(run.pose()) && o.glyphs.text().equals(glyphs.text());
+        }
+
+        @Override
+        public String query() {
+            return glyphs.text(index, SCAN_LENGTH);
+        }
+
+        @Override
+        public int anchorX() {
+            return Math.round(run.toScreen(glyphs.startX()[index], 0).x);
+        }
+
+        @Override
+        public int anchorY() {
+            return Math.round(run.toScreen(0, run.font().lineHeight).y) + 2;
+        }
+
+        @Override
+        public void highlight(GuiGraphicsExtractor graphics, Font font, int utf16Length) {
+            Vector2f a = run.toScreen(glyphs.startX()[index], -1);
+            Vector2f b = run.toScreen(glyphs.matchEndX(index, utf16Length), run.font().lineHeight - 1);
+            graphics.fill(Math.round(Math.min(a.x, b.x)), Math.round(Math.min(a.y, b.y)),
+                    Math.round(Math.max(a.x, b.x)), Math.round(Math.max(a.y, b.y)), MATCH_HIGHLIGHT);
+        }
+    }
+
     private static @Nullable PinnedText pinned;
     private static @Nullable LookupPopup popup;
-    private static PinnedText.@Nullable Hit activeHit;
+    private static @Nullable Target active;
     private static int activeMatchLength;
     private static int generation;
     private static boolean dragging;
@@ -74,15 +153,22 @@ public final class YomitanOverlay {
         return (pinned != null && pinned.contains(mouseX, mouseY)) || (popup != null && popup.contains(mouseX, mouseY));
     }
 
-    static void pin(Component source, List<Component> lines, int anchorX, int anchorY) {
-        Font font = client.font;
-        Component title = Component.empty()
+    private static Component title(Component source) {
+        return Component.empty()
                 .append(source.copy().withStyle(ChatFormatting.GOLD))
                 .append(Component.literal(" — ").withStyle(ChatFormatting.DARK_GRAY))
                 .append(Component.literal("hold ").append(TPPKeyMappings.LOOKUP_KEY.getTranslatedKeyMessage())
-                        .append(" and hover to look up · drag here").withStyle(ChatFormatting.ITALIC));
+                        .append(" and hover · drag here").withStyle(ChatFormatting.ITALIC));
+    }
+
+    static void pin(Component source, List<Component> lines, int anchorX, int anchorY) {
         clear();
-        pinned = new PinnedText(font, title, lines, anchorX, anchorY, screenWidth(), screenHeight());
+        pinned = PinnedText.ofComponents(client.font, title(source), lines, anchorX, anchorY, screenWidth(), screenHeight());
+    }
+
+    private static void pinDrawn(Component source, List<FormattedCharSequence> lines, int anchorX, int anchorY) {
+        clear();
+        pinned = new PinnedText(client.font, title(source), lines, anchorX, anchorY, screenWidth(), screenHeight());
     }
 
     static void centerPinned() {
@@ -95,7 +181,7 @@ public final class YomitanOverlay {
     static void clear() {
         pinned = null;
         popup = null;
-        activeHit = null;
+        active = null;
         activeMatchLength = 0;
         dragging = false;
         generation++;
@@ -106,6 +192,10 @@ public final class YomitanOverlay {
         return TPPKeyMappings.PIN_KEY.matches(InputConstants.Type.MOUSE.getOrCreate(InputConstants.MOUSE_BUTTON_MIDDLE));
     }
 
+    private static boolean isPinClick(MouseButtonEvent click) {
+        return TPPKeyMappings.PIN_KEY.matchesMouse(click) && (!pinNeedsShift() || click.hasShiftDown());
+    }
+
     /** Key mappings don't track presses while a screen is open, so read the bound key directly. */
     private static boolean isLookupHeld() {
         InputConstants.Key key = KeyMappingHelper.getBoundKeyOf(TPPKeyMappings.LOOKUP_KEY);
@@ -113,25 +203,28 @@ public final class YomitanOverlay {
                 && InputConstants.isKeyDown(key.getValue());
     }
 
-    private static boolean isPinClick(MouseButtonEvent click) {
-        return TPPKeyMappings.PIN_KEY.matchesMouse(click) && (!pinNeedsShift() || click.hasShiftDown());
-    }
-
+    /** Freezes the tooltip drawn last frame, in place; falls back to the hovered slot's item. */
     private static boolean tryPin(Screen screen, double mouseX, double mouseY) {
-        int anchorX = (int) mouseX + 12;
-        int anchorY = (int) mouseY - 12;
+        List<TextCapture.Run> tooltip = new ArrayList<>();
+        for (TextCapture.Run run : TextCapture.lastFrame()) {
+            if (run.tooltip()) {
+                tooltip.add(run);
+            }
+        }
+        if (!tooltip.isEmpty()) {
+            tooltip.sort(Comparator.comparingDouble((TextCapture.Run run) -> run.toScreen(0, 0).y)
+                    .thenComparingDouble(run -> run.toScreen(0, 0).x));
+            Vector2f topLeft = tooltip.getFirst().toScreen(0, 0);
+            List<FormattedCharSequence> lines = tooltip.stream().map(TextCapture.Run::text).toList();
+            pinDrawn(Component.literal("Tooltip"), lines, Math.round(topLeft.x) - PinnedText.PADDING,
+                    Math.round(topLeft.y) - PinnedText.PADDING - PinnedText.HEADER_HEIGHT);
+            return true;
+        }
         if (screen instanceof AbstractContainerScreen<?> container) {
             Slot slot = container.hoveredSlot;
             if (slot != null && slot.hasItem()) {
-                pin(Component.literal("Item"), TooltipUtl.getTooltipComponents(slot.getItem(), client), anchorX, anchorY);
-                return true;
-            }
-        }
-        if (screen instanceof ChatScreen) {
-            String message = ((ChatComponentAccessor) client.gui.hud.getChat()).translatorpp$getMessageContentAt(mouseX, mouseY);
-            if (message != null && !message.isBlank()) {
-                List<Component> lines = Arrays.stream(message.split("\n")).map(line -> (Component) Component.literal(line)).toList();
-                pin(Component.literal("Chat"), lines, anchorX, anchorY - 40);
+                pin(Component.literal("Item"), TooltipUtl.getTooltipComponents(slot.getItem(), client),
+                        (int) mouseX + 12, (int) mouseY - 12);
                 return true;
             }
         }
@@ -165,7 +258,7 @@ public final class YomitanOverlay {
         }
         if (popup != null) {
             popup = null; // clicking elsewhere dismisses the popup, like Yomitan
-            activeHit = null;
+            active = null;
         }
         return true;
     }
@@ -176,7 +269,7 @@ public final class YomitanOverlay {
         }
         pinned.moveTo((int) (click.x() - dragOffsetX), (int) (click.y() - dragOffsetY), screenWidth(), screenHeight());
         popup = null;
-        activeHit = null;
+        active = null;
         return false;
     }
 
@@ -192,7 +285,7 @@ public final class YomitanOverlay {
         if (key.isEscape() && !(screen instanceof LookupScreen)) {
             if (popup != null) {
                 popup = null;
-                activeHit = null;
+                active = null;
                 return false;
             }
             if (pinned != null) {
@@ -217,59 +310,78 @@ public final class YomitanOverlay {
     private static void afterExtract(Screen screen, GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         lastMouseX = mouseX;
         lastMouseY = mouseY;
-        if (pinned == null) {
-            return;
-        }
         Font font = client.font;
-        graphics.nextStratum();
 
-        PinnedText.Hit hit = pinned.hitTest(font, mouseX, mouseY);
-        boolean overPopup = popup != null && popup.contains(mouseX, mouseY);
-        if (isLookupHeld() && hit != null && !overPopup && !sameCharacter(hit, activeHit)) {
-            lookUp(hit);
+        if (isLookupHeld() && !(popup != null && popup.contains(mouseX, mouseY))) {
+            Target target = targetAt(font, mouseX, mouseY);
+            if (target != null && !target.sameAs(active)) {
+                lookUp(target);
+            }
         }
 
-        pinned.extract(graphics, font);
-        if (activeHit != null && activeMatchLength > 0) {
-            int endX = pinned.matchEndX(activeHit, activeMatchLength);
-            graphics.fill(activeHit.x(), activeHit.y() - 1, endX, activeHit.y() + font.lineHeight - 1, MATCH_HIGHLIGHT);
-        }
-        if (popup != null) {
-            graphics.nextStratum();
-            popup.extract(graphics, font);
-        }
-    }
-
-    private static boolean sameCharacter(PinnedText.Hit a, PinnedText.@Nullable Hit b) {
-        return b != null && a.line() == b.line() && a.index() == b.index() && a.x() == b.x() && a.y() == b.y();
-    }
-
-    private static void lookUp(PinnedText.Hit hit) {
-        PinnedText box = pinned;
-        if (box == null) {
+        if (pinned == null && popup == null && active == null) {
             return;
         }
-        activeHit = hit;
+        TextCapture.runUncaptured(() -> {
+            graphics.nextStratum();
+            if (pinned != null) {
+                pinned.extract(graphics, font);
+            }
+            if (active != null && activeMatchLength > 0) {
+                active.highlight(graphics, font, activeMatchLength);
+            }
+            if (popup != null) {
+                graphics.nextStratum();
+                popup.extract(graphics, font);
+            }
+        });
+    }
+
+    /** The pinned box wins; otherwise the topmost text drawn under the cursor last frame. */
+    private static @Nullable Target targetAt(Font font, int mouseX, int mouseY) {
+        if (pinned != null && pinned.contains(mouseX, mouseY)) {
+            PinnedText.Hit hit = pinned.hitTest(font, mouseX, mouseY);
+            return hit == null ? null : new PinnedTarget(pinned, hit);
+        }
+        List<TextCapture.Run> runs = TextCapture.lastFrame();
+        for (int i = runs.size() - 1; i >= 0; i--) {
+            TextCapture.Run run = runs.get(i);
+            if (run.tooltip() || (run.scissor() != null && !run.scissor().containsPoint(mouseX, mouseY))) {
+                continue;
+            }
+            Vector2f local = run.toLocal(mouseX + 0.5, mouseY + 0.5);
+            if (local == null || local.y < 0 || local.y >= run.font().lineHeight) {
+                continue;
+            }
+            LineGlyphs glyphs = LineGlyphs.measure(run.font(), run.text());
+            int index = glyphs.indexAt((int) Math.floor(local.x));
+            if (index >= 0) {
+                return new ScreenTarget(run, glyphs, index);
+            }
+        }
+        return null;
+    }
+
+    private static void lookUp(Target target) {
+        active = target;
         activeMatchLength = 0;
         int request = ++generation;
-        String query = box.queryAt(hit, SCAN_LENGTH);
+        String query = target.query();
         YomitanClient.termEntries(query).whenComplete((entries, error) -> client.execute(() -> {
-            if (request != generation || pinned != box) {
+            if (request != generation) {
                 return; // the cursor moved on, or the box was closed
             }
-            int anchorX = hit.x();
-            int anchorY = hit.y() + client.font.lineHeight + 2;
             if (error != null) {
                 TranslatorPP.LOGGER.warn("Yomitan lookup for '{}' failed: {}", query, error.toString());
                 popup = LookupPopup.message(client.font, Component.literal(
                                 "Couldn't reach Yomitan at " + YomitanClient.BASE + ". Is Chrome open, with "
                                         + "\"Enable Yomitan API\" on in Yomitan's settings?")
-                        .withStyle(ChatFormatting.RED), anchorX, anchorY, screenWidth(), screenHeight());
+                        .withStyle(ChatFormatting.RED), target.anchorX(), target.anchorY(), screenWidth(), screenHeight());
             } else if (entries.isEmpty()) {
                 popup = null;
             } else {
                 activeMatchLength = entries.stream().mapToInt(TermEntry::matchLength).max().orElse(0);
-                popup = LookupPopup.results(client.font, entries, anchorX, anchorY, screenWidth(), screenHeight());
+                popup = LookupPopup.results(client.font, entries, target.anchorX(), target.anchorY(), screenWidth(), screenHeight());
             }
         }));
     }
@@ -280,11 +392,7 @@ public final class YomitanOverlay {
                 continue;
             }
             WorldTextPicker.Picked picked = WorldTextPicker.pick(minecraft);
-            if (picked == null) {
-                minecraft.gui.hud.setOverlayMessage(Component.literal("No text under the crosshair"), false);
-            } else {
-                minecraft.setScreenAndShow(new LookupScreen(picked.source(), picked.lines()));
-            }
+            minecraft.setScreenAndShow(picked == null ? new LookupScreen() : new LookupScreen(picked.source(), picked.lines()));
         }
     }
 

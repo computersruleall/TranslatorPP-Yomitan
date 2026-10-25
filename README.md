@@ -14,19 +14,21 @@ Lookups go to your own [Yomitan](https://github.com/yomidevs/yomitan) through
 
 In game:
 
-- **Pin text**: Shift + middle click (rebindable as "Pin Text for Dictionary Lookup").
-  - Over an item in any inventory or menu: pins its tooltip (name, lore, everything shown).
-  - Over a chat line with chat open: pins that message.
-  - In the world, aimed at a sign, text display or nametag: opens it in a lookup screen.
-    Text behind blocks is skipped unless the game draws it through walls. Stacked hologram lines are joined.
-- **Look up**: hold the lookup key (Left Shift, rebindable as "Yomitan Lookup") and move the cursor over the
-  pinned text. The popup lists every result from every dictionary, styled like Yomitan's popup (furigana,
-  tag pills, numbered senses); scroll it with the mouse wheel. The matched text is highlighted.
+- **Look up any text**: with any screen open, hold the lookup key (Left Shift, rebindable as "Yomitan Lookup")
+  over text: container titles, item names, book pages, chat, buttons, the scoreboard and other HUD text. The
+  mod records every line of text the GUI draws each frame, so it works without knowing which screen drew it.
+  The popup lists every result from every dictionary, styled like Yomitan's (furigana, tag pills, numbered
+  senses); scroll it with the mouse wheel. The matched text is highlighted.
+- **Pin**: Shift + middle click (rebindable as "Pin Text for Dictionary Lookup").
+  - With a tooltip showing (items, buttons, chat hover text): freezes it in place so you can hover it.
+  - During play: opens a lookup screen. Aimed at a sign, text display or nametag, that text is pinned (text
+    behind blocks is skipped unless the game draws it through walls; stacked hologram lines are joined).
+    Otherwise the screen is transparent and just frees the cursor, so the HUD can be hovered.
+- Drag the box by its header. Esc closes the popup, then the box; the pin key over the box also closes it.
 - Translation keeps its own key (T). It is ignored while you are typing in a text box, and the default
   target language is English.
 
 Requires Fabric API and Cloth Config.
-- Drag the box by its header. Esc closes the popup, then the box; the pin key over the box also closes it.
 
 Text that is drawn as an image (map art, custom font icons) can't be read.
 

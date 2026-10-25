@@ -2,3 +2,7 @@ accessWidener v2 official
 
 accessible field net/minecraft/client/gui/components/ChatComponent allMessages Ljava/util/List;
 accessible field net/minecraft/client/gui/screens/inventory/AbstractContainerScreen hoveredSlot Lnet/minecraft/world/inventory/Slot;
+accessible field net/minecraft/client/renderer/state/gui/GuiTextRenderState font Lnet/minecraft/client/gui/Font;
+accessible field net/minecraft/client/renderer/state/gui/GuiTextRenderState text Lnet/minecraft/util/FormattedCharSequence;
+accessible field net/minecraft/client/renderer/state/gui/GuiTextRenderState x I
+accessible field net/minecraft/client/renderer/state/gui/GuiTextRenderState y I
