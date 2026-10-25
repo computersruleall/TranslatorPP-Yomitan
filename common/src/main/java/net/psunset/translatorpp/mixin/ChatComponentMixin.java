@@ -99,6 +99,26 @@ public abstract class ChatComponentMixin implements ChatComponentAccessor {
 
     @Unique
     @Override
+    @Nullable
+    public FormattedCharSequence translatorpp$getLineContentAt(double globalMouseX, double globalMouseY) {
+        int i = this.translatorpp$getMessageLineIndexAt(this.translatorpp$screenToChatX(globalMouseX), this.translatorpp$screenToChatY(globalMouseY));
+        return i >= 0 ? this.trimmedMessages.get(i).content() : null;
+    }
+
+    @Unique
+    @Override
+    public double translatorpp$getChatScale() {
+        return this.getScale();
+    }
+
+    @Unique
+    @Override
+    public int translatorpp$getChatLineHeight() {
+        return this.getLineHeight();
+    }
+
+    @Unique
+    @Override
     public int[] translatorpp$getMessageIndexTrimmedToAll() {
         return translatorpp$messageIndexTrimmedToAll;
     }

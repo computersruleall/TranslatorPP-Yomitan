@@ -46,6 +46,12 @@ public interface TPPConfig {
 
     String getOllamaModel();
 
+    /** Width of the Yomitan dictionary popup, in GUI pixels. */
+    int getYomitanPopupWidth();
+
+    /** Tallest the Yomitan dictionary popup grows before it scrolls, in GUI pixels. */
+    int getYomitanPopupMaxHeight();
+
     @ExpectMixin(value = ExpectMixin.Expected.NEOFORGE, method = ExpectMixin.Method.OVERWRITE)
     static void init() {
         if (Platform.isNeoForge()) {
@@ -144,6 +150,16 @@ public interface TPPConfig {
             return Default.ollamaModel;
         }
 
+        @Override
+        public int getYomitanPopupWidth() {
+            return Default.yomitanPopupWidth;
+        }
+
+        @Override
+        public int getYomitanPopupMaxHeight() {
+            return Default.yomitanPopupMaxHeight;
+        }
+
         public static void init() {
             ClientTickCallbacks.POST.register(client -> {
                 while (TPPKeyMappings.CONFIG_KEY.consumeClick()) {
@@ -170,5 +186,7 @@ public interface TPPConfig {
         String libreBaseUrl = "https://libretranslate.com/";
         String ollamaBaseUrl = "http://127.0.0.1:11434/";
         String ollamaModel = "";
+        int yomitanPopupWidth = 230;
+        int yomitanPopupMaxHeight = 170;
     }
 }

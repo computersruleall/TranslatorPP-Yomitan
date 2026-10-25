@@ -5,6 +5,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
+import net.psunset.translatorpp.config.TPPConfig;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,10 +17,8 @@ import java.util.List;
  * scrollable panel.
  */
 public final class LookupPopup {
-    private static final int WIDTH = 300;
     private static final int PADDING = 6;
     private static final int INDENT = 10;
-    private static final int MAX_HEIGHT = 240;
     private static final int SCROLL_STEP = 30;
     private static final int TERM_SCALE = 2;
 
@@ -47,12 +46,10 @@ public final class LookupPopup {
         }
     }
 
+    /** Vertical space; dividers are drawn by the popup, which knows its width. */
     private record SpacerRow(int height, boolean divider) implements Row {
         @Override
         public void draw(GuiGraphicsExtractor graphics, Font font, int x, int y) {
-            if (divider) {
-                graphics.fill(x - PADDING + 1, y + height / 2, x + WIDTH - PADDING - 1, y + height / 2 + 1, DIVIDER);
-            }
         }
     }
 
@@ -180,6 +177,8 @@ public final class LookupPopup {
     }
 
     private final List<Row> rows = new ArrayList<>();
+    private final int width = Math.max(160, TPPConfig.getInstance().getYomitanPopupWidth());
+    private final int maxHeight = Math.max(80, TPPConfig.getInstance().getYomitanPopupMaxHeight());
     private int x;
     private int y;
     private int height;
@@ -235,14 +234,14 @@ public final class LookupPopup {
     }
 
     private void addText(Font font, Component text, int offset, int color) {
-        for (FormattedCharSequence line : font.split(text, WIDTH - PADDING * 2 - offset)) {
+        for (FormattedCharSequence line : font.split(text, width - PADDING * 2 - offset)) {
             rows.add(new TextRow(offset, line, color, font.lineHeight + 1));
         }
     }
 
     /** Pills wrap onto further rows when they don't fit; the sense number only leads the first. */
     private void addPills(Font font, String number, List<String> labels, List<Integer> colors) {
-        int available = WIDTH - PADDING * 2;
+        int available = width - PADDING * 2;
         int used = number.isEmpty() ? 0 : font.width(number) + 4;
         List<String> rowLabels = new ArrayList<>();
         List<Integer> rowColors = new ArrayList<>();
@@ -267,14 +266,14 @@ public final class LookupPopup {
 
     private void layout(int anchorX, int anchorY, int screenWidth, int screenHeight) {
         contentHeight = rows.stream().mapToInt(Row::height).sum();
-        height = Math.min(contentHeight + PADDING * 2, Math.min(MAX_HEIGHT, screenHeight - 8));
-        x = Mth.clamp(anchorX, 4, Math.max(4, screenWidth - WIDTH - 4));
+        height = Math.min(contentHeight + PADDING * 2, Math.min(maxHeight, screenHeight - 8));
+        x = Mth.clamp(anchorX, 4, Math.max(4, screenWidth - width - 4));
         // Below the hovered character if it fits, otherwise above it.
         y = anchorY + height + 4 <= screenHeight ? anchorY : Math.max(4, anchorY - 12 - height);
     }
 
     public boolean contains(double mouseX, double mouseY) {
-        return mouseX >= x && mouseX < x + WIDTH && mouseY >= y && mouseY < y + height;
+        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
     }
 
     public void scroll(double amount) {
@@ -283,15 +282,19 @@ public final class LookupPopup {
     }
 
     public void extract(GuiGraphicsExtractor graphics, Font font) {
-        graphics.fill(x, y, x + WIDTH, y + height, BACKGROUND);
-        graphics.outline(x, y, WIDTH, height, BORDER);
+        graphics.fill(x, y, x + width, y + height, BACKGROUND);
+        graphics.outline(x, y, width, height, BORDER);
 
         int top = y + PADDING;
         int bottom = y + height - PADDING;
-        graphics.enableScissor(x + 1, y + 1, x + WIDTH - 1, y + height - 1);
+        graphics.enableScissor(x + 1, y + 1, x + width - 1, y + height - 1);
         int rowY = top - (int) scroll;
         for (Row row : rows) {
             if (rowY + row.height() >= y && rowY <= bottom) {
+                if (row instanceof SpacerRow spacer && spacer.divider()) {
+                    int lineY = rowY + spacer.height() / 2;
+                    graphics.fill(x + 1, lineY, x + width - 1, lineY + 1, DIVIDER);
+                }
                 row.draw(graphics, font, x + PADDING, rowY);
             }
             rowY += row.height();
@@ -302,7 +305,7 @@ public final class LookupPopup {
         if (contentHeight > viewport) {
             int barHeight = Math.max(10, viewport * viewport / contentHeight);
             int barY = top + (int) ((viewport - barHeight) * (scroll / (contentHeight - viewport)));
-            graphics.fill(x + WIDTH - 4, barY, x + WIDTH - 2, barY + barHeight, 0xFF6A6A6A);
+            graphics.fill(x + width - 4, barY, x + width - 2, barY + barHeight, 0xFF6A6A6A);
         }
     }
 }

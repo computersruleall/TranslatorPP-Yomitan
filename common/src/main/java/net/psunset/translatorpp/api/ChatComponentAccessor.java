@@ -1,6 +1,7 @@
 package net.psunset.translatorpp.api;
 
 import net.psunset.translatorpp.mixin.ChatComponentMixin;
+import net.minecraft.util.FormattedCharSequence;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -23,4 +24,11 @@ public interface ChatComponentAccessor {
     double translatorpp$screenToChatY(double y);
 
     int translatorpp$getMessageLineIndexAt(double mouseX, double mouseY);
+
+    /** The wrapped chat line under the cursor, as drawn, or null. Takes screen coordinates. */
+    @Nullable FormattedCharSequence translatorpp$getLineContentAt(double globalMouseX, double globalMouseY);
+
+    double translatorpp$getChatScale();
+
+    int translatorpp$getChatLineHeight();
 }

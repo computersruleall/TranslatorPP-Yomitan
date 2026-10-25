@@ -13,11 +13,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class GuiRenderStateMixin {
     @Inject(method = "addText", at = @At("HEAD"))
     private void translatorpp$captureText(GuiTextRenderState text, CallbackInfo ci) {
-        TextCapture.onText(text);
+        TextCapture.onText(this, text);
     }
 
     @Inject(method = "reset", at = @At("HEAD"))
     private void translatorpp$endFrame(CallbackInfo ci) {
-        TextCapture.endFrame();
+        TextCapture.endFrame(this);
     }
 }

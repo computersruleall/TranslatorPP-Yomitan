@@ -10,6 +10,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.KeyEvent;
@@ -18,6 +19,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.inventory.Slot;
 import net.psunset.translatorpp.TranslatorPP;
+import net.psunset.translatorpp.api.ChatComponentAccessor;
 import net.psunset.translatorpp.keybind.TPPKeyMappings;
 import net.psunset.translatorpp.tool.TooltipUtl;
 import org.jetbrains.annotations.Nullable;
@@ -118,6 +120,50 @@ public final class YomitanOverlay {
         }
     }
 
+    /**
+     * A character of a chat line, located from vanilla's chat layout rather than
+     * from captured text: Lunar draws chat with its own renderer, which the
+     * capture never sees, but it keeps vanilla's line positions.
+     */
+    private record ChatTarget(LineGlyphs glyphs, int index, int row, double scale, int lineHeight) implements Target {
+        private static final int CHAT_BOTTOM_MARGIN = 40;
+        private static final int CHAT_LEFT_MARGIN = 4;
+
+        private int screenX(int chatX) {
+            return (int) Math.round((chatX + CHAT_LEFT_MARGIN) * scale);
+        }
+
+        private int rowBottom() {
+            return (int) Math.round(client.getWindow().getGuiScaledHeight() - CHAT_BOTTOM_MARGIN - row * scale * lineHeight);
+        }
+
+        @Override
+        public boolean sameAs(@Nullable Target other) {
+            return other instanceof ChatTarget o && o.index == index && o.row == row && o.glyphs.text().equals(glyphs.text());
+        }
+
+        @Override
+        public String query() {
+            return glyphs.text(index, SCAN_LENGTH);
+        }
+
+        @Override
+        public int anchorX() {
+            return screenX(glyphs.startX()[index]);
+        }
+
+        @Override
+        public int anchorY() {
+            return rowBottom() + 2;
+        }
+
+        @Override
+        public void highlight(GuiGraphicsExtractor graphics, Font font, int utf16Length) {
+            int top = (int) Math.round(rowBottom() - scale * lineHeight);
+            graphics.fill(screenX(glyphs.startX()[index]), top, screenX(glyphs.matchEndX(index, utf16Length)), rowBottom(), MATCH_HIGHLIGHT);
+        }
+    }
+
     private static @Nullable PinnedText pinned;
     private static @Nullable LookupPopup popup;
     private static @Nullable Target active;
@@ -128,6 +174,7 @@ public final class YomitanOverlay {
     private static double dragOffsetY;
     private static int lastMouseX;
     private static int lastMouseY;
+    private static long lastDiagnosticAt;
 
     private YomitanOverlay() {
     }
@@ -234,8 +281,13 @@ public final class YomitanOverlay {
     private static boolean allowMouseClick(Screen screen, MouseButtonEvent click) {
         double mouseX = click.x();
         double mouseY = click.y();
-        if (popup != null && popup.contains(mouseX, mouseY)) {
-            return false;
+        if (popup != null) {
+            if (popup.contains(mouseX, mouseY)) {
+                return false;
+            }
+            // Any click outside the popup closes it, including one on the pinned box.
+            popup = null;
+            active = null;
         }
         if (pinned != null && pinned.contains(mouseX, mouseY)) {
             if (isPinClick(click) && !(screen instanceof LookupScreen)) {
@@ -255,10 +307,6 @@ public final class YomitanOverlay {
             if (tryPin(screen, mouseX, mouseY)) {
                 return false;
             }
-        }
-        if (popup != null) {
-            popup = null; // clicking elsewhere dismisses the popup, like Yomitan
-            active = null;
         }
         return true;
     }
@@ -316,6 +364,8 @@ public final class YomitanOverlay {
             Target target = targetAt(font, mouseX, mouseY);
             if (target != null && !target.sameAs(active)) {
                 lookUp(target);
+            } else if (target == null) {
+                logNoTarget(screen, mouseX, mouseY);
             }
         }
 
@@ -359,7 +409,43 @@ public final class YomitanOverlay {
                 return new ScreenTarget(run, glyphs, index);
             }
         }
+        if (client.gui.screen() instanceof ChatScreen) {
+            return chatTargetAt(font, mouseX, mouseY);
+        }
         return null;
+    }
+
+    private static @Nullable Target chatTargetAt(Font font, int mouseX, int mouseY) {
+        ChatComponentAccessor chat = (ChatComponentAccessor) client.gui.hud.getChat();
+        FormattedCharSequence line = chat.translatorpp$getLineContentAt(mouseX, mouseY);
+        if (line == null) {
+            return null;
+        }
+        double scale = chat.translatorpp$getChatScale();
+        int lineHeight = chat.translatorpp$getChatLineHeight();
+        LineGlyphs glyphs = LineGlyphs.measure(font, line);
+        int index = glyphs.indexAt((int) Math.floor(chat.translatorpp$screenToChatX(mouseX)));
+        if (index < 0) {
+            return null;
+        }
+        int row = (int) Math.floor(chat.translatorpp$screenToChatY(mouseY));
+        return new ChatTarget(glyphs, index, row, scale, lineHeight);
+    }
+
+    /** When the lookup key finds nothing, say what was captured, at most every few seconds. */
+    private static void logNoTarget(Screen screen, int mouseX, int mouseY) {
+        long now = System.currentTimeMillis();
+        if (now - lastDiagnosticAt < 3000) {
+            return;
+        }
+        lastDiagnosticAt = now;
+        String nearest = TextCapture.lastFrame().stream()
+                .filter(run -> !run.tooltip())
+                .min(Comparator.comparingDouble(run -> run.toScreen(0, 0).distanceSquared(mouseX, mouseY)))
+                .map(run -> "'" + LineGlyphs.measure(run.font(), run.text()).text(0, 30) + "' at " + run.toScreen(0, 0))
+                .orElse("none");
+        TranslatorPP.LOGGER.info("[Yomitan] nothing under cursor ({}, {}) on {}; captured: {}; nearest run: {}",
+                mouseX, mouseY, screen.getClass().getName(), TextCapture.describe(), nearest);
     }
 
     private static void lookUp(Target target) {

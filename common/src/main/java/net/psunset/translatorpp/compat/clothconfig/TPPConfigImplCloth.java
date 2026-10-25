@@ -96,6 +96,16 @@ public class TPPConfigImplCloth implements TPPConfig {
         return config().ollama_model;
     }
 
+    @Override
+    public int getYomitanPopupWidth() {
+        return config().yomitan_popup_width;
+    }
+
+    @Override
+    public int getYomitanPopupMaxHeight() {
+        return config().yomitan_popup_max_height;
+    }
+
     public static TPPConfigData config() {
         return holder.getConfig();
     }
@@ -148,6 +158,10 @@ public class TPPConfigImplCloth implements TPPConfig {
         private String ollama_baseurl = Default.ollamaBaseUrl;
         private String ollama_model = Default.ollamaModel;
 
+        /* Yomitan */
+        private int yomitan_popup_width = Default.yomitanPopupWidth;
+        private int yomitan_popup_max_height = Default.yomitanPopupMaxHeight;
+
         @Override
         public Screen createScreen(Screen parent) {
             ConfigBuilder builder = ConfigBuilder.create()
@@ -161,6 +175,7 @@ public class TPPConfigImplCloth implements TPPConfig {
             ConfigCategory deepl = builder.getOrCreateCategory(Component.translatable("config.category.translatorpp.deepl"));
             ConfigCategory libre = builder.getOrCreateCategory(Component.translatable("config.category.translatorpp.libre"));
             ConfigCategory ollama = builder.getOrCreateCategory(Component.translatable("config.category.translatorpp.ollama"));
+            ConfigCategory yomitan = builder.getOrCreateCategory(Component.translatable("config.category.translatorpp.yomitan"));
 
             general.addEntry(entryBuilder.startEnumSelector(Component.translatable("config.translatorpp.mode"), TranslationMode.class, this.mode)
                     .setTooltip(Component.translatable("config.translatorpp.mode.tooltip"))
@@ -326,6 +341,20 @@ public class TPPConfigImplCloth implements TPPConfig {
                     })
                     .build());
 
+
+            /* ---------------------------------------- */
+
+            yomitan.addEntry(entryBuilder.startIntSlider(Component.translatable("config.translatorpp.yomitan_popup_width"), this.yomitan_popup_width, 160, 480)
+                    .setTooltip(Component.translatable("config.translatorpp.yomitan_popup_width.tooltip"))
+                    .setDefaultValue(Default.yomitanPopupWidth)
+                    .setSaveConsumer(it -> this.yomitan_popup_width = it)
+                    .build());
+
+            yomitan.addEntry(entryBuilder.startIntSlider(Component.translatable("config.translatorpp.yomitan_popup_max_height"), this.yomitan_popup_max_height, 80, 400)
+                    .setTooltip(Component.translatable("config.translatorpp.yomitan_popup_max_height.tooltip"))
+                    .setDefaultValue(Default.yomitanPopupMaxHeight)
+                    .setSaveConsumer(it -> this.yomitan_popup_max_height = it)
+                    .build());
 
             return builder.build();
         }
