@@ -286,6 +286,7 @@ public final class YomitanOverlay {
     private static boolean allowMouseClick(Screen screen, MouseButtonEvent click) {
         double mouseX = click.x();
         double mouseY = click.y();
+        boolean closedPopup = false;
         if (popup != null) {
             if (popup.contains(mouseX, mouseY)) {
                 return false;
@@ -293,6 +294,7 @@ public final class YomitanOverlay {
             // Any click outside the popup closes it, including one on the pinned box.
             popup = null;
             active = null;
+            closedPopup = true;
         }
         if (pinned != null && pinned.contains(mouseX, mouseY)) {
             if (isPinClick(click) && !(screen instanceof LookupScreen)) {
@@ -315,6 +317,14 @@ public final class YomitanOverlay {
             if (tryPin(screen, mouseX, mouseY)) {
                 return false;
             }
+        }
+        if (screen instanceof LookupScreen && click.button() == InputConstants.MOUSE_BUTTON_LEFT) {
+            // A left click on empty space hands the cursor back to the camera; if it
+            // only dismissed the popup, stay so the next word can be looked up.
+            if (!closedPopup) {
+                screen.onClose();
+            }
+            return false;
         }
         return true;
     }
