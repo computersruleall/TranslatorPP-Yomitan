@@ -206,6 +206,7 @@ public final class YomitanOverlay {
     private static int lastMouseY;
     private static long lastDiagnosticAt;
     private static long lastContinuationLogAt;
+    private static long lastTargetAt;
     private static @Nullable Screen lastDescribedScreen;
     private static int framesOnScreen;
 
@@ -431,10 +432,22 @@ public final class YomitanOverlay {
 
         if (isLookupHeld() && !(popup != null && popup.contains(mouseX, mouseY))) {
             Target target = targetAt(font, mouseX, mouseY);
-            if (target != null && !target.sameAs(active)) {
-                lookUp(target);
-            } else if (target == null) {
+            if (target != null) {
+                lastTargetAt = System.currentTimeMillis();
+                if (!target.sameAs(active)) {
+                    lookUp(target);
+                }
+            } else {
                 logNoTarget(screen, mouseX, mouseY);
+                // Holding the key over nothing (empty space, a stack count) hides the last
+                // popup, so it doesn't look like it belongs to what's under the cursor now.
+                // The short grace lets the cursor cross the gap into the popup.
+                if (popup != null && System.currentTimeMillis() - lastTargetAt > 250) {
+                    popup = null;
+                    active = null;
+                    activeMatchLength = 0;
+                    generation++;
+                }
             }
         }
 
