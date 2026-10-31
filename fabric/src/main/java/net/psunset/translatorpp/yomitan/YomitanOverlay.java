@@ -19,6 +19,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.inventory.Slot;
 import net.psunset.translatorpp.TranslatorPP;
+import net.psunset.translatorpp.config.TPPConfig;
+import net.psunset.translatorpp.core.YomitanSource;
+import net.psunset.translatorpp.yomitan.local.LocalYomitan;
 import net.psunset.translatorpp.api.ChatComponentAccessor;
 import net.psunset.translatorpp.keybind.TPPKeyMappings;
 import net.psunset.translatorpp.tool.TooltipUtl;
@@ -28,6 +31,8 @@ import org.joml.Vector2f;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /**
  * Yomitan lookups on any text in the game.
@@ -593,13 +598,30 @@ public final class YomitanOverlay {
                 + "; captured: " + TextCapture.describe() + "; nearest run: " + nearest);
     }
 
+    private static CompletableFuture<List<TermEntry>> lookup(String query) {
+        return TPPConfig.getInstance().getYomitanSource() == YomitanSource.BUILT_IN
+                ? LocalYomitan.get().termEntries(query)
+                : YomitanClient.termEntries(query);
+    }
+
+    private static String problemMessage(Throwable error) {
+        Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+        if (cause instanceof LookupProblem) {
+            return cause.getMessage();
+        }
+        return TPPConfig.getInstance().getYomitanSource() == YomitanSource.BUILT_IN
+                ? "The dictionary lookup failed. See the game log."
+                : "Couldn't reach Yomitan at " + YomitanClient.BASE + ". Is your browser open, with "
+                + "\"Enable Yomitan API\" on in Yomitan's settings?";
+    }
+
     private static void lookUp(Target target) {
         active = target;
         activeMatchLength = 0;
         int request = ++generation;
         String query = target.query();
         DebugLog.write("looking up '" + query + "' (" + target.getClass().getSimpleName() + ")");
-        YomitanClient.termEntries(query).whenComplete((entries, error) -> client.execute(() -> {
+        lookup(query).whenComplete((entries, error) -> client.execute(() -> {
             DebugLog.write("'" + query + "' -> " + (error != null ? error.toString()
                     : entries.size() + " entries" + (request != generation ? " (stale, dropped)" : "")));
             if (request != generation) {
@@ -607,9 +629,7 @@ public final class YomitanOverlay {
             }
             if (error != null) {
                 TranslatorPP.LOGGER.warn("Yomitan lookup for '{}' failed: {}", query, error.toString());
-                popup = LookupPopup.message(client.font, Component.literal(
-                                "Couldn't reach Yomitan at " + YomitanClient.BASE + ". Is Chrome open, with "
-                                        + "\"Enable Yomitan API\" on in Yomitan's settings?")
+                popup = LookupPopup.message(client.font, Component.literal(problemMessage(error))
                         .withStyle(ChatFormatting.RED), target.anchorX(), target.anchorY(), screenWidth(), screenHeight());
             } else if (entries.isEmpty()) {
                 popup = null;
@@ -621,6 +641,11 @@ public final class YomitanOverlay {
     }
 
     private static void tick(Minecraft minecraft) {
+        while (TPPKeyMappings.DICTIONARIES_KEY.consumeClick()) {
+            if (minecraft.gui.screen() == null) {
+                minecraft.setScreenAndShow(new DictionaryScreen(null));
+            }
+        }
         while (TPPKeyMappings.FREE_CURSOR_KEY.consumeClick()) {
             if (minecraft.gui.screen() == null && minecraft.player != null) {
                 minecraft.setScreenAndShow(new LookupScreen());

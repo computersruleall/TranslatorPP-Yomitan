@@ -1,43 +1,48 @@
 # Translator++ (Yomitan fork)
 
-A fork of [Translator++](https://github.com/pSUNSET/TranslatorPP) for Minecraft 26.3 (Fabric only, for Lunar Client)
-that adds Yomitan-style dictionary lookups on top of the original translation features.
-
-## Dictionary lookups
-
-Lookups go to your own [Yomitan](https://github.com/yomidevs/yomitan) through
-[yomitan-api](https://github.com/yomidevs/yomitan-api), so they use whatever dictionaries you have installed there.
-
-1. Install yomitan-api (run `install_yomitan_api.py`, pick your browser).
-2. In Yomitan's settings, turn on Advanced, then General → **Enable Yomitan API**, and restart the browser.
-   The browser must be running while you play; the API listens on `127.0.0.1:19633`.
-
-In game:
-
-- **Look up any text**: with any screen open, hold the lookup key (Left Shift, rebindable as "Yomitan Lookup")
-  over text: container titles, item names, book pages, chat, buttons, the scoreboard and other HUD text. The
-  mod records every line of text the GUI draws each frame, so it works without knowing which screen drew it.
-  The popup lists every result from every dictionary, styled like Yomitan's (furigana, tag pills, numbered
-  senses); scroll it with the mouse wheel. The matched text is highlighted.
-- **Pin**: Shift + middle click (rebindable as "Pin Text for Dictionary Lookup").
-  - With a tooltip showing (items, buttons, chat hover text): freezes it in place so you can hover it.
-  - During play: opens a lookup screen. Aimed at a sign, text display or nametag, that text is pinned (text
-    behind blocks is skipped unless the game draws it through walls; stacked hologram lines are joined).
-    Otherwise the screen is transparent and just frees the cursor, so the HUD can be hovered.
-- **Free cursor**: Left Alt (rebindable as "Free Cursor for Lookups") toggles a free cursor during play without
-  moving the camera, to hover the action bar, boss bars, scoreboard and other HUD text. Press it again, left-click empty space, or Esc to close.
-- Drag the box by its header. Left-click drag over its text to select, then Ctrl+C to copy.
-  Any click outside the popup closes it; Esc closes the popup, then the box; the pin key over the box also closes it.
-- The popup's width and max height are in the settings screen (O), under Yomitan.
-- Translation keeps its own key (T). It is ignored while you are typing in a text box, and the default
-  target language is English.
-
-- The upstream `/translate` client command is `/tpptranslate` here. A client command takes priority over the
-  server's, so `/translate` would swallow a server's own command of that name, including clickable chat icons.
+A fork of [Translator++](https://github.com/pSUNSET/TranslatorPP) for Minecraft 26.3 (Fabric only, for Lunar Client).
+It translates with Microsoft Azure using your own key, and has a built-in Yomitan-style dictionary. The mod has no commands.
 
 Requires Fabric API and Cloth Config.
 
-Text that is drawn as an image (map art, custom font icons) can't be read.
+## Translation
+
+Add your key from an Azure Translator resource in the settings (O), plus its region unless the resource is global.
+The key is stored unencrypted in `config/translatorpp.toml`.
+
+Chat Translation has two modes:
+
+- **Hover Key**: nothing happens until you hold the translate key (T) over a message, item or book.
+- **Automatic**: messages not in your target language are replaced by their translation as they arrive, keeping the
+  rank, name and icons around them. Hover the translated text for the original. The hover key still works everywhere.
+  Your own messages are left alone. Language detection comes first, so English chat costs no translation characters.
+
+**Treat Chat as Japanese On** lists server addresses, separated by commas. On those servers all chat goes to Azure as
+Japanese with no detection, in both modes, and Latin text is read as romaji. English written there will come out wrong.
+
+## Dictionary lookups
+
+Lookups run inside the game, from dictionaries you import. No browser is needed.
+
+- **Manage dictionaries**: Y opens the manager (rebindable). Drop Yomitan dictionary `.zip` files onto the window, or put
+  them in `config/translatorpp/import` and press Import from Folder. Reorder, turn on and off, or remove them there.
+  The top dictionary's entries come first when several match equally well. Term dictionaries only for now: kanji,
+  frequency and pitch-accent dictionaries, and images in entries, aren't supported.
+- **Look up any text**: with any screen open, hold the lookup key (Left Shift, rebindable) over text: container titles,
+  item names, book pages, chat, buttons, the scoreboard and other HUD text. A word wrapped onto the next line is still
+  found. The popup lists every result from every enabled dictionary; scroll it with the mouse wheel.
+- **Pin**: Shift + middle click (rebindable) freezes a visible tooltip so you can hover it. During play it opens a lookup
+  screen with the sign, text display or nametag you're aiming at.
+- **Free cursor**: Left Alt (rebindable) frees the cursor during play without moving the camera, to hover HUD text.
+  Press it again, left-click empty space, or press Esc to close.
+- In the pinned box, drag the header to move it, or drag over text to select it and press Ctrl+C to copy. Any click
+  outside the popup closes it. Esc closes the popup, then the box.
+- Popup size is in the settings under Yomitan.
+
+Text drawn as an image (map art, custom font icons) can't be read.
+
+Lookup Source in the settings can switch back to the Yomitan browser extension through
+[yomitan-api](https://github.com/yomidevs/yomitan-api), which needs the browser running.
 
 ---
 

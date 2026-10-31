@@ -1,6 +1,5 @@
 package net.psunset.translatorpp;
 
-import net.psunset.translatorpp.command.TPPCommands;
 import net.psunset.translatorpp.compat.jade.TPPCompatJade;
 import net.psunset.translatorpp.config.TPPConfig;
 import net.psunset.translatorpp.core.TranslationKit;
@@ -20,7 +19,6 @@ public final class TranslatorPP {
     public static void init() {
         TranslationKit.init();
         TPPConfig.init();
-        TPPCommands.init();
         if (CompatUtl.Jade.isLoaded()) {
             TPPCompatJade.init();
         }

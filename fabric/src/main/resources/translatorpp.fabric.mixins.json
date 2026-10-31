@@ -8,8 +8,7 @@
         "AbstractContainerScreenMixin",
         "GuiGraphicsExtractorMixin",
         "GameRendererMixin",
-        "GuiTextRenderStateMixin",
-        "FabricClientCommandSourceMixin"
+        "GuiTextRenderStateMixin"
     ],
     "mixins": [
     ],

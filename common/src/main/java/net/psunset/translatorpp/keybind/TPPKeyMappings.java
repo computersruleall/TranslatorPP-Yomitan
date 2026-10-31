@@ -39,6 +39,14 @@ public final class TPPKeyMappings {
             Categories.GENERAL
     );
 
+    /** Opens the manager for the built-in engine's dictionaries. */
+    public static final KeyMapping DICTIONARIES_KEY = register(
+            "key.translatorpp.dictionaries",
+            InputConstants.Type.KEYBOARD,
+            InputConstants.KEY_Y,
+            Categories.GENERAL
+    );
+
     /** Toggles a free cursor during play, to hover HUD text (action bar, boss bars, scoreboard). */
     public static final KeyMapping FREE_CURSOR_KEY = register(
             "key.translatorpp.free_cursor",

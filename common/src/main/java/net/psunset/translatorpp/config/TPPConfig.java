@@ -4,9 +4,9 @@ import net.minecraft.network.chat.Component;
 import net.psunset.translatorpp.TranslatorPP;
 import net.psunset.translatorpp.annotations.ExpectMixin;
 import net.psunset.translatorpp.compat.clothconfig.TPPConfigImplCloth;
-import net.psunset.translatorpp.core.OpenAIClientProvider;
+import net.psunset.translatorpp.core.ChatTranslationMode;
 import net.psunset.translatorpp.core.TranslationMode;
-import net.psunset.translatorpp.core.TranslationService;
+import net.psunset.translatorpp.core.YomitanSource;
 import net.psunset.translatorpp.event.ClientTickCallbacks;
 import net.psunset.translatorpp.keybind.TPPKeyMappings;
 import net.psunset.translatorpp.platform.Platform;
@@ -26,25 +26,16 @@ public interface TPPConfig {
 
     String getTargetLanguage();
 
-    TranslationService getService();
+    ChatTranslationMode getChatTranslation();
 
-    String getOpenaiApiKey();
+    /** Comma-separated server addresses where all chat is treated as Japanese, romaji included. */
+    String getJapaneseServers();
 
-    OpenAIClientProvider.Api getOpenaiBaseUrl();
+    String getAzureKey();
 
-    String getOpenaiCustomBaseUrl();
+    String getAzureRegion();
 
-    String getOpenaiModel();
-
-    String getDeepLApiKey();
-
-    String getLibreApiKey();
-
-    String getLibreBaseUrl();
-
-    String getOllamaBaseUrl();
-
-    String getOllamaModel();
+    YomitanSource getYomitanSource();
 
     /** Width of the Yomitan dictionary popup, in GUI pixels. */
     int getYomitanPopupWidth();
@@ -101,53 +92,28 @@ public interface TPPConfig {
         }
 
         @Override
-        public TranslationService getService() {
-            return Default.service;
+        public ChatTranslationMode getChatTranslation() {
+            return Default.chatTranslation;
         }
 
         @Override
-        public String getOpenaiApiKey() {
-            return Default.openaiApiKey;
+        public String getJapaneseServers() {
+            return Default.japaneseServers;
         }
 
         @Override
-        public OpenAIClientProvider.Api getOpenaiBaseUrl() {
-            return Default.openaiBaseUrl;
+        public String getAzureKey() {
+            return Default.azureKey;
         }
 
         @Override
-        public String getOpenaiCustomBaseUrl() {
-            return Default.openaiCustomBaseUrl;
+        public String getAzureRegion() {
+            return Default.azureRegion;
         }
 
         @Override
-        public String getOpenaiModel() {
-            return Default.openaiModel;
-        }
-
-        @Override
-        public String getDeepLApiKey() {
-            return Default.deeplApiKey;
-        }
-
-        @Override
-        public String getLibreApiKey() {
-            return Default.libreApiKey;
-        }
-
-        @Override
-        public String getLibreBaseUrl() {
-            return Default.libreBaseUrl;
-        }
-
-        @Override
-        public String getOllamaBaseUrl() {
-            return Default.ollamaBaseUrl;
-        }
-
-        @Override
-        public String getOllamaModel() {
-            return Default.ollamaModel;
+        public YomitanSource getYomitanSource() {
+            return Default.yomitanSource;
         }
 
         @Override
@@ -176,16 +142,11 @@ public interface TPPConfig {
         TranslationMode mode = TranslationMode.NAME_TOP;
         String sourceLanguage = "auto";
         String targetLanguage = "en";
-        TranslationService service = TranslationService.GoogleTranslation;
-        String openaiApiKey = "";
-        OpenAIClientProvider.Api openaiBaseUrl = OpenAIClientProvider.Api.OpenAI;
-        String openaiCustomBaseUrl = "https://custom.api.url/";
-        String openaiModel = "";
-        String deeplApiKey = "";
-        String libreApiKey = "";
-        String libreBaseUrl = "https://libretranslate.com/";
-        String ollamaBaseUrl = "http://127.0.0.1:11434/";
-        String ollamaModel = "";
+        ChatTranslationMode chatTranslation = ChatTranslationMode.HOVER;
+        String japaneseServers = "";
+        String azureKey = "";
+        String azureRegion = "";
+        YomitanSource yomitanSource = YomitanSource.BUILT_IN;
         int yomitanPopupWidth = 230;
         int yomitanPopupMaxHeight = 170;
     }

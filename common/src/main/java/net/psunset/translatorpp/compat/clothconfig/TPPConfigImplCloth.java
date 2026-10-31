@@ -14,7 +14,11 @@ import net.psunset.translatorpp.api.ComponentizableEnum;
 import net.psunset.translatorpp.api.ITPPClothConfigData;
 import net.psunset.translatorpp.compat.clothconfig.gui.TPPConfigClothScreenWrapper;
 import net.psunset.translatorpp.config.TPPConfig;
-import net.psunset.translatorpp.core.*;
+import net.psunset.translatorpp.core.ChatAutoTranslator;
+import net.psunset.translatorpp.core.ChatTranslationMode;
+import net.psunset.translatorpp.core.TranslationKit;
+import net.psunset.translatorpp.core.TranslationMode;
+import net.psunset.translatorpp.core.YomitanSource;
 import net.psunset.translatorpp.event.ClientTickCallbacks;
 import net.psunset.translatorpp.keybind.TPPKeyMappings;
 import net.psunset.translatorpp.tool.LangUtl;
@@ -27,9 +31,6 @@ import org.jetbrains.annotations.ApiStatus;
 @ApiStatus.Internal
 public class TPPConfigImplCloth implements TPPConfig {
     private static ConfigHolder<TPPConfigData> holder;
-
-    public TPPConfigImplCloth() {
-    }
 
     @Override
     public TranslationMode getMode() {
@@ -47,53 +48,28 @@ public class TPPConfigImplCloth implements TPPConfig {
     }
 
     @Override
-    public TranslationService getService() {
-        return config().service;
+    public ChatTranslationMode getChatTranslation() {
+        return config().chat_translation;
     }
 
     @Override
-    public String getOpenaiApiKey() {
-        return config().openai_apikey;
+    public String getJapaneseServers() {
+        return config().japanese_servers;
     }
 
     @Override
-    public OpenAIClientProvider.Api getOpenaiBaseUrl() {
-        return config().openai_baseurl;
+    public String getAzureKey() {
+        return config().azure_key;
     }
 
     @Override
-    public String getOpenaiCustomBaseUrl() {
-        return config().openai_custom_baseurl;
+    public String getAzureRegion() {
+        return config().azure_region;
     }
 
     @Override
-    public String getOpenaiModel() {
-        return config().openai_model;
-    }
-
-    @Override
-    public String getDeepLApiKey() {
-        return config().deepl_apikey;
-    }
-
-    @Override
-    public String getLibreApiKey() {
-        return config().libre_apikey;
-    }
-
-    @Override
-    public String getLibreBaseUrl() {
-        return config().libre_baseurl;
-    }
-
-    @Override
-    public String getOllamaBaseUrl() {
-        return config().ollama_baseurl;
-    }
-
-    @Override
-    public String getOllamaModel() {
-        return config().ollama_model;
+    public YomitanSource getYomitanSource() {
+        return config().yomitan_source;
     }
 
     @Override
@@ -123,42 +99,22 @@ public class TPPConfigImplCloth implements TPPConfig {
                 client.setScreenAndShow(TPPConfigClothScreenWrapper.createScreen(client.gui.screen()));
             }
         });
-
-        OpenAIClientProvider.getInstance().refresh();
-        OpenAIClientProvider.refreshCacheModels();
-        DeepLTranslationProvider.getInstance().refresh();
-        LibreTranslateProvider.getInstance().refresh();
-        OllamaClientProvider.getInstance().refresh();
-        OllamaClientProvider.refreshCacheModels();
     }
 
     @Config(name = TranslatorPP.ID)
     public static final class TPPConfigData implements ITPPClothConfigData {
 
-        /* General */
+        /* Translation */
         private TranslationMode mode = Default.mode;
         private String source_language = Default.sourceLanguage;
         private String target_language = Default.targetLanguage;
-        private TranslationService service = Default.service;
-
-        /* OpenAI */
-        private String openai_apikey = Default.openaiApiKey;
-        private OpenAIClientProvider.Api openai_baseurl = Default.openaiBaseUrl;
-        private String openai_custom_baseurl = Default.openaiCustomBaseUrl;
-        private String openai_model = Default.openaiModel;
-
-        /* DeepL */
-        private String deepl_apikey = Default.deeplApiKey;
-
-        /* Libre */
-        private String libre_apikey = Default.libreApiKey;
-        private String libre_baseurl = Default.libreBaseUrl;
-
-        /* Ollama */
-        private String ollama_baseurl = Default.ollamaBaseUrl;
-        private String ollama_model = Default.ollamaModel;
+        private ChatTranslationMode chat_translation = Default.chatTranslation;
+        private String japanese_servers = Default.japaneseServers;
+        private String azure_key = Default.azureKey;
+        private String azure_region = Default.azureRegion;
 
         /* Yomitan */
+        private YomitanSource yomitan_source = Default.yomitanSource;
         private int yomitan_popup_width = Default.yomitanPopupWidth;
         private int yomitan_popup_max_height = Default.yomitanPopupMaxHeight;
 
@@ -171,11 +127,47 @@ public class TPPConfigImplCloth implements TPPConfig {
 
             ConfigEntryBuilder entryBuilder = builder.entryBuilder();
             ConfigCategory general = builder.getOrCreateCategory(Component.translatable("config.category.translatorpp.general"));
-            ConfigCategory openai = builder.getOrCreateCategory(Component.translatable("config.category.translatorpp.openai"));
-            ConfigCategory deepl = builder.getOrCreateCategory(Component.translatable("config.category.translatorpp.deepl"));
-            ConfigCategory libre = builder.getOrCreateCategory(Component.translatable("config.category.translatorpp.libre"));
-            ConfigCategory ollama = builder.getOrCreateCategory(Component.translatable("config.category.translatorpp.ollama"));
             ConfigCategory yomitan = builder.getOrCreateCategory(Component.translatable("config.category.translatorpp.yomitan"));
+
+            general.addEntry(entryBuilder.startEnumSelector(Component.translatable("config.translatorpp.chat_translation"), ChatTranslationMode.class, this.chat_translation)
+                    .setTooltip(Component.translatable("config.translatorpp.chat_translation.tooltip"))
+                    .setEnumNameProvider(e -> ((ComponentizableEnum) e).toComponent())
+                    .setDefaultValue(Default.chatTranslation)
+                    .setSaveConsumer(it -> this.chat_translation = it)
+                    .build());
+
+            general.addEntry(entryBuilder.startStrField(Component.translatable("config.translatorpp.azure_key"), this.azure_key)
+                    .setTooltip(Component.translatable("config.translatorpp.azure_key.tooltip"))
+                    .setDefaultValue(Default.azureKey)
+                    .setSaveConsumer(it -> {
+                        if (!this.azure_key.equals(it)) {
+                            this.azure_key = it;
+                            OnSaveManager.clearTranslationCachesLater();
+                        }
+                    })
+                    .build());
+
+            general.addEntry(entryBuilder.startStrField(Component.translatable("config.translatorpp.azure_region"), this.azure_region)
+                    .setTooltip(Component.translatable("config.translatorpp.azure_region.tooltip"))
+                    .setDefaultValue(Default.azureRegion)
+                    .setSaveConsumer(it -> {
+                        if (!this.azure_region.equals(it)) {
+                            this.azure_region = it;
+                            OnSaveManager.clearTranslationCachesLater();
+                        }
+                    })
+                    .build());
+
+            general.addEntry(entryBuilder.startStrField(Component.translatable("config.translatorpp.japanese_servers"), this.japanese_servers)
+                    .setTooltip(Component.translatable("config.translatorpp.japanese_servers.tooltip"))
+                    .setDefaultValue(Default.japaneseServers)
+                    .setSaveConsumer(it -> {
+                        if (!this.japanese_servers.equals(it)) {
+                            this.japanese_servers = it;
+                            OnSaveManager.clearTranslationCachesLater();
+                        }
+                    })
+                    .build());
 
             general.addEntry(entryBuilder.startEnumSelector(Component.translatable("config.translatorpp.mode"), TranslationMode.class, this.mode)
                     .setTooltip(Component.translatable("config.translatorpp.mode.tooltip"))
@@ -213,136 +205,18 @@ public class TPPConfigImplCloth implements TPPConfig {
                     })
                     .build());
 
-            general.addEntry(entryBuilder.startEnumSelector(Component.translatable("config.translatorpp.service"), TranslationService.class, this.service)
-                    .setTooltip(Component.translatable("config.translatorpp.service.tooltip"))
+            /* ---------------------------------------- */
+
+            yomitan.addEntry(entryBuilder.startTextDescription(Component.translatable("config.translatorpp.yomitan_manage",
+                            TPPKeyMappings.DICTIONARIES_KEY.getTranslatedKeyMessage()))
+                    .build());
+
+            yomitan.addEntry(entryBuilder.startEnumSelector(Component.translatable("config.translatorpp.yomitan_source"), YomitanSource.class, this.yomitan_source)
+                    .setTooltip(Component.translatable("config.translatorpp.yomitan_source.tooltip"))
                     .setEnumNameProvider(e -> ((ComponentizableEnum) e).toComponent())
-                    .setDefaultValue(Default.service)
-                    .setSaveConsumer(it -> {
-                        if (this.service != it) {
-                            this.service = it;
-                            OnSaveManager.clearTranslationCachesLater();
-                        }
-                    })
+                    .setDefaultValue(Default.yomitanSource)
+                    .setSaveConsumer(it -> this.yomitan_source = it)
                     .build());
-
-            /* ---------------------------------------- */
-
-            openai.addEntry(entryBuilder.startStrField(Component.translatable("config.translatorpp.openai_apikey"), this.openai_apikey)
-                    .setTooltip(Component.translatable("config.translatorpp.openai_apikey.tooltip"))
-                    .setDefaultValue(Default.openaiApiKey)
-                    .setSaveConsumer(it -> {
-                        if (!this.openai_apikey.equals(it)) {
-                            this.openai_apikey = it;
-                            OnSaveManager.refreshOpenaiLater();
-                            OnSaveManager.refreshOpenaiCacheModelsLater();
-                        }
-                    })
-                    .build());
-
-            openai.addEntry(entryBuilder.startEnumSelector(Component.translatable("config.translatorpp.openai_baseurl"), OpenAIClientProvider.Api.class, this.openai_baseurl)
-                    .setTooltip(Component.translatable("config.translatorpp.openai_baseurl.tooltip"))
-                    .setEnumNameProvider(e -> ((ComponentizableEnum) e).toComponent())
-                    .setDefaultValue(Default.openaiBaseUrl)
-                    .setSaveConsumer(it -> {
-                        if (!this.openai_baseurl.equals(it)) {
-                            this.openai_baseurl = it;
-                            OnSaveManager.refreshOpenaiLater();
-                            OnSaveManager.refreshOpenaiCacheModelsLater();
-                        }
-                    })
-                    .build());
-
-            openai.addEntry(entryBuilder.startStrField(Component.translatable("config.translatorpp.openai_custom_baseurl"), this.openai_custom_baseurl)
-                    .setTooltip(Component.translatable("config.translatorpp.openai_custom_baseurl.tooltip"))
-                    .setDefaultValue(Default.openaiCustomBaseUrl)
-                    .setSaveConsumer(it -> {
-                        if (!this.openai_custom_baseurl.equals(it)) {
-                            this.openai_custom_baseurl = it;
-                            OnSaveManager.refreshOpenaiLater();
-                            OnSaveManager.refreshOpenaiCacheModelsLater();
-                        }
-                    })
-                    .build());
-
-            openai.addEntry(entryBuilder.startStringDropdownMenu(Component.translatable("config.translatorpp.openai_model"), this.openai_model)
-                    .setTooltip(Component.translatable("config.translatorpp.openai_model.tooltip"))
-                    .setSelections(OpenAIClientProvider.getCacheModels())
-                    .setDefaultValue(Default.openaiModel)
-                    .setSaveConsumer(it -> {
-                        if (!this.openai_model.equals(it)) {
-                            this.openai_model = it;
-                            OnSaveManager.refreshOpenaiLater();
-                            OnSaveManager.clearTranslationCachesLater();
-                        }
-                    })
-                    .build());
-
-            /* ---------------------------------------- */
-
-            deepl.addEntry(entryBuilder.startStrField(Component.translatable("config.translatorpp.deepl_apikey"), this.deepl_apikey)
-                    .setTooltip(Component.translatable("config.translatorpp.deepl_apikey.tooltip"))
-                    .setDefaultValue(Default.deeplApiKey)
-                    .setSaveConsumer(it -> {
-                        if (!this.deepl_apikey.equals(it)) {
-                            this.deepl_apikey = it;
-                            OnSaveManager.refreshDeeplLater();
-                        }
-                    })
-                    .build());
-
-            /* ---------------------------------------- */
-
-            libre.addEntry(entryBuilder.startStrField(Component.translatable("config.translatorpp.libre_apikey"), this.libre_apikey)
-                    .setTooltip(Component.translatable("config.translatorpp.libre_apikey.tooltip"))
-                    .setDefaultValue(Default.libreApiKey)
-                    .setSaveConsumer(it -> {
-                        if (!this.libre_apikey.equals(it)) {
-                            this.libre_apikey = it;
-                            OnSaveManager.refreshLibreLater();
-                        }
-                    })
-                    .build());
-
-            libre.addEntry(entryBuilder.startStrField(Component.translatable("config.translatorpp.libre_baseurl"), this.libre_baseurl)
-                    .setTooltip(Component.translatable("config.translatorpp.libre_baseurl.tooltip"))
-                    .setDefaultValue(Default.libreBaseUrl)
-                    .setSaveConsumer(it -> {
-                        if (!this.libre_baseurl.equals(it)) {
-                            this.libre_baseurl = it;
-                            OnSaveManager.refreshLibreLater();
-                        }
-                    })
-                    .build());
-
-            /* ---------------------------------------- */
-
-            ollama.addEntry(entryBuilder.startStrField(Component.translatable("config.translatorpp.ollama_baseurl"), this.ollama_baseurl)
-                    .setTooltip(Component.translatable("config.translatorpp.ollama_baseurl.tooltip"))
-                    .setDefaultValue(Default.ollamaBaseUrl)
-                    .setSaveConsumer(it -> {
-                        if (!this.ollama_baseurl.equals(it)) {
-                            this.ollama_baseurl = it;
-                            OnSaveManager.refreshOllamaLater();
-                            OnSaveManager.refreshOllamaCacheModelsLater();
-                        }
-                    })
-                    .build());
-
-            ollama.addEntry(entryBuilder.startStringDropdownMenu(Component.translatable("config.translatorpp.ollama_model"), this.ollama_model)
-                    .setTooltip(Component.translatable("config.translatorpp.ollama_model.tooltip"))
-                    .setSelections(OllamaClientProvider.getCacheModels())
-                    .setDefaultValue(Default.ollamaModel)
-                    .setSaveConsumer(it -> {
-                        if (!this.ollama_model.equals(it)) {
-                            this.ollama_model = it;
-                            OnSaveManager.refreshOllamaLater();
-                            OnSaveManager.clearTranslationCachesLater();
-                        }
-                    })
-                    .build());
-
-
-            /* ---------------------------------------- */
 
             yomitan.addEntry(entryBuilder.startIntSlider(Component.translatable("config.translatorpp.yomitan_popup_width"), this.yomitan_popup_width, 160, 480)
                     .setTooltip(Component.translatable("config.translatorpp.yomitan_popup_width.tooltip"))
@@ -362,39 +236,9 @@ public class TPPConfigImplCloth implements TPPConfig {
 
     private static final class OnSaveManager {
         private static boolean shouldClearTranslationCaches = false;
-        private static boolean shouldRefreshOpenai = false;
-        private static boolean shouldRefreshOpenaiCacheModels = false;
-        private static boolean shouldRefreshDeepl = false;
-        private static boolean shouldRefreshLibre = false;
-        private static boolean shouldRefreshOllama = false;
-        private static boolean shouldRefreshOllamaCacheModels = false;
 
         private static void clearTranslationCachesLater() {
             shouldClearTranslationCaches = true;
-        }
-
-        private static void refreshOpenaiLater() {
-            shouldRefreshOpenai = true;
-        }
-
-        private static void refreshOpenaiCacheModelsLater() {
-            shouldRefreshOpenaiCacheModels = true;
-        }
-
-        private static void refreshDeeplLater() {
-            shouldRefreshDeepl = true;
-        }
-
-        private static void refreshLibreLater() {
-            shouldRefreshLibre = true;
-        }
-
-        private static void refreshOllamaLater() {
-            shouldRefreshOllama = true;
-        }
-
-        private static void refreshOllamaCacheModelsLater() {
-            shouldRefreshOllamaCacheModels = true;
         }
 
         private static void fire() {
@@ -402,37 +246,8 @@ public class TPPConfigImplCloth implements TPPConfig {
 
             if (shouldClearTranslationCaches) {
                 TranslationKit.getInstance().clearCache();
+                ChatAutoTranslator.clearCache();
                 shouldClearTranslationCaches = false;
-            }
-
-            if (shouldRefreshOpenai) {
-                OpenAIClientProvider.getInstance().refresh();
-                shouldRefreshOpenai = false;
-            }
-
-            if (shouldRefreshOpenaiCacheModels) {
-                OpenAIClientProvider.refreshCacheModels();
-                shouldRefreshOpenaiCacheModels = false;
-            }
-
-            if (shouldRefreshDeepl) {
-                DeepLTranslationProvider.getInstance().refresh();
-                shouldRefreshDeepl = false;
-            }
-
-            if (shouldRefreshLibre) {
-                LibreTranslateProvider.getInstance().refresh();
-                shouldRefreshLibre = false;
-            }
-
-            if (shouldRefreshOllama) {
-                OllamaClientProvider.getInstance().refresh();
-                shouldRefreshOllama = false;
-            }
-
-            if (shouldRefreshOllamaCacheModels) {
-                OllamaClientProvider.refreshCacheModels();
-                shouldRefreshOllamaCacheModels = false;
             }
         }
     }

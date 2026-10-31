@@ -12,6 +12,7 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Util;
 import net.psunset.translatorpp.api.ChatComponentAccessor;
+import net.psunset.translatorpp.core.ChatAutoTranslator;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -60,6 +61,14 @@ public abstract class ChatComponentMixin implements ChatComponentAccessor {
     @Shadow
     protected abstract int getLineHeight();
 
+    @Shadow
+    protected abstract void refreshTrimmedMessages();
+
+    @Inject(method = "addMessageToQueue(Lnet/minecraft/client/multiplayer/chat/GuiMessage;)V", at = @At("HEAD"))
+    private void translatorpp$onNewMessage(GuiMessage message, CallbackInfo ci) {
+        ChatAutoTranslator.onMessage(message);
+    }
+
     @Inject(method = "clearMessages(Z)V", at = @At("TAIL"))
     private void translatorpp$afterClearMessages(boolean bl, CallbackInfo ci) {
         Arrays.fill(this.translatorpp$messageIndexTrimmedToAll, -1);
@@ -103,6 +112,20 @@ public abstract class ChatComponentMixin implements ChatComponentAccessor {
     public FormattedCharSequence translatorpp$getLineContentAt(double globalMouseX, double globalMouseY) {
         int i = this.translatorpp$getMessageLineIndexAt(this.translatorpp$screenToChatX(globalMouseX), this.translatorpp$screenToChatY(globalMouseY));
         return i >= 0 ? this.trimmedMessages.get(i).content() : null;
+    }
+
+    @Unique
+    @Override
+    public void translatorpp$replaceMessage(GuiMessage original, GuiMessage replacement) {
+        for (int i = 0; i < this.allMessages.size(); i++) {
+            if (this.allMessages.get(i) == original) {
+                this.allMessages.set(i, replacement);
+                int scroll = this.chatScrollbarPos;
+                this.refreshTrimmedMessages();
+                this.chatScrollbarPos = Math.min(scroll, Math.max(0, this.trimmedMessages.size() - this.getLinesPerPage()));
+                return;
+            }
+        }
     }
 
     @Unique

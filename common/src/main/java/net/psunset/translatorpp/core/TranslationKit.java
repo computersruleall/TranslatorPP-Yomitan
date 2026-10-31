@@ -26,7 +26,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
@@ -48,11 +47,6 @@ public final class TranslationKit {
         translationThread.setDaemon(true); // Allow JVM to exit even if this thread is running
         return translationThread;
     });
-    private static final ExecutorService independentExecutor = Executors.newSingleThreadExecutor(r -> {
-        Thread translationThread = new Thread(r, "TranslationIWorker-" + taskCounter.incrementAndGet());
-        translationThread.setDaemon(true);
-        return translationThread;
-    });
 
     public static TranslationKit getInstance() {
         return INSTANCE;
@@ -62,6 +56,7 @@ public final class TranslationKit {
 
     // TODO: Make cache size configurable
     private static final int MAX_CACHE_SIZE = 100;
+    private static final long ERROR_INTERVAL_MILLIS = 10_000;
 
     /**
      * A cache with LRU eviction policy to store recent translations.
@@ -80,6 +75,13 @@ public final class TranslationKit {
      */
     @Nullable
     private String hoveredText = null;
+
+    /**
+     * Whether {@link #hoveredText} is a chat line.
+     */
+    private boolean hoveredIsChat = false;
+
+    private volatile long lastErrorAt = 0;
 
     /**
      * The text that is being translated, null if not translating yet.
@@ -119,6 +121,7 @@ public final class TranslationKit {
             return;
         }
         this.hoveredText = TooltipUtl.getCombinedTooltipText(stack, client);
+        this.hoveredIsChat = false;
     }
 
     public void setHoveredText(List<Component> tooltip) {
@@ -127,10 +130,18 @@ public final class TranslationKit {
             return;
         }
         this.hoveredText = TooltipUtl.getCombinedTooltipText(tooltip);
+        this.hoveredIsChat = false;
     }
 
     public void setHoveredText(@Nullable String text) {
         this.hoveredText = text;
+        this.hoveredIsChat = false;
+    }
+
+    /** As {@link #setHoveredText(String)}, for a whole chat line. */
+    public void setHoveredChat(@Nullable String line) {
+        this.hoveredText = line;
+        this.hoveredIsChat = line != null;
     }
 
     public @Nullable String getTranslatedText() {
@@ -167,8 +178,18 @@ public final class TranslationKit {
 
         translatedText = hoveredText;
 
+        // Chat is translated without the rank and name in front of the message, and honours
+        // the per-server Japanese override. Item names and the like go as they are.
+        String text = translatedText;
+        boolean chat = hoveredIsChat;
+        int bodyStart = chat ? ChatText.bodyStart(text) : 0;
+        String body = chat ? text.substring(bodyStart, ChatText.bodyEnd(text, bodyStart)) : text;
+        String source = chat ? ChatAutoTranslator.sourceFor(body) : TPPConfig.getInstance().getSourceLanguage();
+        String target = TPPConfig.getInstance().getTargetLanguage();
+        String cacheKey = source + "|" + target + "|" + text;
+
         // Check cache first
-        String cachedResult = translationCache.get(translatedText);
+        String cachedResult = translationCache.get(cacheKey);
         if (cachedResult != null) {
             translatedResult = I18n.get("misc.translatorpp.translation", cachedResult) + SUCCESS;
             translated = true;
@@ -182,11 +203,12 @@ public final class TranslationKit {
         translationFuture = CompletableFuture
                 .supplyAsync(() -> {
                     try {
-                        return TPPConfig.getInstance().getService().provider.translate(
-                                translatedText,
-                                TPPConfig.getInstance().getSourceLanguage(),
-                                TPPConfig.getInstance().getTargetLanguage()
-                        );
+                        AzureTranslationProvider azure = AzureTranslationProvider.getInstance();
+                        if (!chat) {
+                            return azure.translate(body, source, target);
+                        }
+                        ChatText.Prepared prepared = ChatText.prepare(body);
+                        return prepared.restore(ChatText.sanitize(azure.translate(prepared.shielded(), source, target)));
                     } catch (Exception e) {
                         throw (e instanceof RuntimeException re) ? re : new RuntimeException(e);
                     }
@@ -194,44 +216,30 @@ public final class TranslationKit {
                 .thenAcceptAsync(it -> {
                     // Update the result and cache it
                     translatedResult = it + SUCCESS;
-                    translationCache.put(translatedText, it); // Add to cache
+                    translationCache.put(cacheKey, it); // Add to cache
                 }, translationExecutor)
                 .exceptionally(err -> {
-                    TranslatorPP.LOGGER.error("Translation failed for: {}. Cause: {}", translatedText, err.getCause());
+                    TranslatorPP.LOGGER.error("Translation failed. Cause: {}", err.getCause());
                     translatedResult = I18n.get("misc.translatorpp.translation.failure") + ERROR;
-                    MessageUtl.threadSafeToLocal(createErrorMessage(err.getCause()));
+                    reportError(err.getCause());
                     return null; // Indicate exception was handled
                 });
     }
 
-
-    public void startIndependently(String translatedText, Consumer<String> onSuccess, Consumer<Throwable> onError) {
-        startIndependently(translatedText, TPPConfig.getInstance().getSourceLanguage(), TPPConfig.getInstance().getTargetLanguage(), onSuccess, onError);
-    }
-
-    public void startIndependently(String translatedText, String sl, String tl, Consumer<String> onSuccess, Consumer<Throwable> onError) {
-        // Check cache first
-        String cachedResult = translationCache.get(translatedText);
-        if (cachedResult != null) {
-            onSuccess.accept(cachedResult);
-            return; // Skip API call
+    /** Holding the key over several messages during an outage shouldn't fill chat with the same error. */
+    private void reportError(Throwable err) {
+        long now = System.currentTimeMillis();
+        if (now - lastErrorAt >= ERROR_INTERVAL_MILLIS) {
+            lastErrorAt = now;
+            MessageUtl.threadSafeToLocal(createErrorMessage(err));
         }
-
-        CompletableFuture.runAsync(() -> {
-            try {
-                String result = TPPConfig.getInstance().getService().provider.translate(translatedText, sl, tl);
-                onSuccess.accept(result);
-            } catch (Exception e) {
-                TranslatorPP.LOGGER.error("Translation failed for: {}. Cause: {}", translatedText, e);
-                onError.accept(e);
-            }
-        }, independentExecutor);
     }
 
     private Component createErrorMessage(Throwable err) {
+        Throwable cause = err instanceof RuntimeException && err.getCause() != null ? err.getCause() : err;
         MutableComponent content = err instanceof ServiceException se ?
-                Component.translatable("misc.translatorpp.translation.failure.chat.status_code", se.statusCode, se.getMessage()) :
-                Component.translatable("misc.translatorpp.translation.failure.chat", err.toString());
+                Component.literal(se.getMessage()) :
+                Component.translatable("misc.translatorpp.translation.failure.chat", cause.toString());
         return content.withColor(TextColor.RED);
     }
 
@@ -340,7 +348,6 @@ public final class TranslationKit {
 
     public static void init() {
         Runtime.getRuntime().addShutdownHook(new Thread(translationExecutor::shutdownNow));
-        Runtime.getRuntime().addShutdownHook(new Thread(independentExecutor::shutdownNow));
 
         ItemTooltipCallbacks.EVENT.register((stack, context, flag, lines) -> {
             TranslationKit.getInstance().setHoveredText(lines);
@@ -377,7 +384,7 @@ public final class TranslationKit {
     }
 
     public static String separator() {
-        return TPPConfig.getInstance().getService().provider.separator();
+        return AzureTranslationProvider.getInstance().separator();
     }
 
     public static String literalSeparator() {

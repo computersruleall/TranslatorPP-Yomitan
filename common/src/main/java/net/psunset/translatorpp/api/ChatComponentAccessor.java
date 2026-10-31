@@ -1,6 +1,7 @@
 package net.psunset.translatorpp.api;
 
 import net.psunset.translatorpp.mixin.ChatComponentMixin;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.util.FormattedCharSequence;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,4 +32,7 @@ public interface ChatComponentAccessor {
     double translatorpp$getChatScale();
 
     int translatorpp$getChatLineHeight();
+
+    /** Swaps a message already in chat for another, keeping its place and the scroll position. */
+    void translatorpp$replaceMessage(GuiMessage original, GuiMessage replacement);
 }
