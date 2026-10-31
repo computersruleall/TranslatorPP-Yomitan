@@ -38,7 +38,7 @@ public final class TPPCommands {
         RegisterClientCommandsCallbacks.EVENT.register(((dispatcher, ctx) -> {
 
             dispatcher.register(
-                    literal("translate")
+                    literal("tpptranslate")
                             .then(argument("text", StringArgumentType.greedyString())
                                     .executes(context -> executeTranslate(
                                             context.getSource(),

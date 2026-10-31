@@ -32,6 +32,9 @@ In game:
 - Translation keeps its own key (T). It is ignored while you are typing in a text box, and the default
   target language is English.
 
+- The upstream `/translate` client command is `/tpptranslate` here. A client command takes priority over the
+  server's, so `/translate` would swallow a server's own command of that name, including clickable chat icons.
+
 Requires Fabric API and Cloth Config.
 
 Text that is drawn as an image (map art, custom font icons) can't be read.
